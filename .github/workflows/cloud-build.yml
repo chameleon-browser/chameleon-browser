@@ -1,0 +1,61 @@
+name: cloud-build
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/cloud-build.yml"
+      - ".github/actions/install/**"
+      - "build.zig"
+      - "build.zig.zon"
+      - "src/**"
+      - "vendor/**"
+      - "Makefile"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/cloud-build.yml"
+      - ".github/actions/install/**"
+      - "build.zig"
+      - "build.zig.zon"
+      - "src/**"
+      - "vendor/**"
+      - "Makefile"
+  workflow_dispatch:
+
+jobs:
+  build-linux-x86_64:
+    name: build linux x86_64
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - uses: ./.github/actions/install
+        with:
+          os: linux
+          arch: x86_64
+
+      - name: Build snapshot
+        run: zig build -Dprebuilt_v8_path=v8/libc_v8.a -Doptimize=ReleaseFast snapshot_creator -- src/snapshot.bin
+
+      - name: Build lightpanda
+        run: zig build -Dsnapshot_path=../../snapshot.bin -Dprebuilt_v8_path=v8/libc_v8.a -Doptimize=ReleaseFast -Dcpu=x86_64 -Dgit_commit=$(git rev-parse --short ${{ github.sha }})
+
+      - name: Rename binary
+        run: mv zig-out/bin/lightpanda lightpanda-x86_64-linux
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lightpanda-x86_64-linux
+          path: lightpanda-x86_64-linux
+          if-no-files-found: error
+          retention-days: 7
