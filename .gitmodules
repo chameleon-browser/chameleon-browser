@@ -13,3 +13,6 @@
 [submodule "vendor/brotli"]
 	path = vendor/brotli
 	url = https://github.com/google/brotli
+[submodule "vendor/curl-impersonate"]
+	path = vendor/curl-impersonate
+	url = https://github.com/lwthiker/curl-impersonate.git
