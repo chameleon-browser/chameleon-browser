@@ -37,6 +37,18 @@
   }
 </script>
 
+<script id="canPlayType_string_coercion">
+  {
+    const audio = document.getElementById('audio1');
+    const mimeLike = {
+      toString() {
+        return 'audio/mp3';
+      },
+    };
+    testing.expectEqual('probably', audio.canPlayType(mimeLike));
+  }
+</script>
+
 <script id="play_pause">
   {
     const audio = document.getElementById('audio1');

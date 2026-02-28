@@ -33,6 +33,7 @@ pub const RunMode = enum {
 mode: Mode,
 exec_name: []const u8,
 http_headers: HttpHeaders,
+default_browser_fingerprint: [:0]const u8,
 
 const Config = @This();
 
@@ -41,6 +42,7 @@ pub fn init(allocator: Allocator, exec_name: []const u8, mode: Mode) !Config {
         .mode = mode,
         .exec_name = exec_name,
         .http_headers = undefined,
+        .default_browser_fingerprint = randomBrowserFingerprint(),
     };
     config.http_headers = try HttpHeaders.init(allocator, &config);
     return config;
@@ -145,6 +147,17 @@ pub fn userAgentSuffix(self: *const Config) ?[]const u8 {
     };
 }
 
+pub fn browserFingerprint(self: *const Config) [:0]const u8 {
+    return switch (self.mode) {
+        inline .serve, .fetch => |opts| opts.common.browser orelse self.default_browser_fingerprint,
+        .help, .version => self.default_browser_fingerprint,
+    };
+}
+
+pub fn browserProfile(self: *const Config) BrowserProfile {
+    return browserProfileForFingerprint(self.browserFingerprint()) orelse unreachable;
+}
+
 pub const Mode = union(RunMode) {
     help: bool, // false when being printed because of an error
     fetch: Fetch,
@@ -185,23 +198,241 @@ pub const Common = struct {
     log_format: ?log.Format = null,
     log_filter_scopes: ?[]log.Scope = null,
     user_agent_suffix: ?[]const u8 = null,
+    browser: ?[:0]const u8 = null,
 };
+
+const browser_fingerprints = [_][:0]const u8{
+    "chrome99",
+    "chrome100",
+    "chrome101",
+    "chrome104",
+    "chrome107",
+    "chrome110",
+    "chrome116",
+    "chrome99_android",
+    "edge99",
+    "edge101",
+    "safari15_3",
+    "safari15_5",
+};
+
+pub const BrowserProfile = struct {
+    user_agent: [:0]const u8,
+    sec_ch_ua_header: [:0]const u8,
+    sec_ch_ua_mobile_header: [:0]const u8,
+    sec_ch_ua_platform_header: [:0]const u8,
+    accept_language_header: [:0]const u8,
+    navigator_platform: [:0]const u8,
+    navigator_vendor: [:0]const u8,
+    navigator_app_version: [:0]const u8,
+    cdp_product: [:0]const u8,
+    cdp_user_agent: [:0]const u8,
+};
+
+const default_browser_fingerprints = [_][:0]const u8{
+    "chrome99",
+    "chrome100",
+    "chrome101",
+    "chrome104",
+    "chrome107",
+    "chrome110",
+    "chrome116",
+    "chrome99_android",
+    "edge99",
+    "edge101",
+};
+
+fn randomBrowserFingerprint() [:0]const u8 {
+    const idx = std.crypto.random.int(u64) % default_browser_fingerprints.len;
+    return default_browser_fingerprints[@intCast(idx)];
+}
+
+const GpuProfile = struct {
+    vendor: [:0]const u8,
+    renderer: [:0]const u8,
+};
+
+/// Pre-collected GPU fingerprints from real-world browsers.
+/// Each entry represents a (vendor, renderer) pair as reported by
+/// WebGL's UNMASKED_VENDOR_WEBGL / UNMASKED_RENDERER_WEBGL.
+const gpu_profiles = [_]GpuProfile{
+    .{ .vendor = "Google Inc. (NVIDIA)", .renderer = "ANGLE (NVIDIA, NVIDIA GeForce GTX 1650 Direct3D11 vs_5_0 ps_5_0, D3D11)" },
+    .{ .vendor = "Google Inc. (NVIDIA)", .renderer = "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)" },
+    .{ .vendor = "Google Inc. (NVIDIA)", .renderer = "ANGLE (NVIDIA, NVIDIA GeForce GTX 1060 6GB Direct3D11 vs_5_0 ps_5_0, D3D11)" },
+    .{ .vendor = "Google Inc. (NVIDIA)", .renderer = "ANGLE (NVIDIA, NVIDIA GeForce RTX 2060 SUPER Direct3D11 vs_5_0 ps_5_0, D3D11)" },
+    .{ .vendor = "Google Inc. (NVIDIA)", .renderer = "ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 Direct3D11 vs_5_0 ps_5_0, D3D11)" },
+    .{ .vendor = "Google Inc. (NVIDIA)", .renderer = "ANGLE (NVIDIA, NVIDIA GeForce GTX 1080 Ti Direct3D11 vs_5_0 ps_5_0, D3D11)" },
+    .{ .vendor = "Google Inc. (AMD)", .renderer = "ANGLE (AMD, AMD Radeon RX 580 Direct3D11 vs_5_0 ps_5_0, D3D11)" },
+    .{ .vendor = "Google Inc. (AMD)", .renderer = "ANGLE (AMD, AMD Radeon RX 5700 XT Direct3D11 vs_5_0 ps_5_0, D3D11)" },
+    .{ .vendor = "Google Inc. (AMD)", .renderer = "ANGLE (AMD, AMD Radeon(TM) Graphics Direct3D11 vs_5_0 ps_5_0, D3D11)" },
+    .{ .vendor = "Google Inc. (Intel)", .renderer = "ANGLE (Intel, Intel(R) UHD Graphics 630 Direct3D11 vs_5_0 ps_5_0, D3D11)" },
+    .{ .vendor = "Google Inc. (Intel)", .renderer = "ANGLE (Intel, Intel(R) UHD Graphics 620 Direct3D11 vs_5_0 ps_5_0, D3D11)" },
+    .{ .vendor = "Google Inc. (Intel)", .renderer = "ANGLE (Intel, Intel(R) Iris(R) Xe Graphics Direct3D11 vs_5_0 ps_5_0, D3D11)" },
+};
+
+fn randomGpuProfile() GpuProfile {
+    const idx = std.crypto.random.int(u64) % gpu_profiles.len;
+    return gpu_profiles[@intCast(idx)];
+}
+
+fn isSupportedBrowserFingerprint(value: []const u8) bool {
+    return browserProfileForFingerprint(value) != null;
+}
+
+fn browserProfileForFingerprint(fingerprint: []const u8) ?BrowserProfile {
+    if (std.mem.eql(u8, fingerprint, "chrome99")) {
+        return browserProfileChrome("99.0.4844.51", "99", "99.0.4844.51");
+    }
+    if (std.mem.eql(u8, fingerprint, "chrome100")) {
+        return browserProfileChrome("100.0.4896.127", "100", "100.0.4896.127");
+    }
+    if (std.mem.eql(u8, fingerprint, "chrome101")) {
+        return browserProfileChrome("101.0.4951.67", "101", "101.0.4951.67");
+    }
+    if (std.mem.eql(u8, fingerprint, "chrome104")) {
+        return browserProfileChrome("104.0.0.0", "104", "104.0.0.0");
+    }
+    if (std.mem.eql(u8, fingerprint, "chrome107")) {
+        return browserProfileChrome("107.0.0.0", "107", "107.0.0.0");
+    }
+    if (std.mem.eql(u8, fingerprint, "chrome110")) {
+        return browserProfileChrome("110.0.0.0", "110", "110.0.0.0");
+    }
+    if (std.mem.eql(u8, fingerprint, "chrome116")) {
+        return browserProfileChrome("116.0.5845.180", "116", "116.0.5845.180");
+    }
+    if (std.mem.eql(u8, fingerprint, "chrome99_android")) {
+        return .{
+            .user_agent = "Mozilla/5.0 (Linux; Android 12; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.58 Mobile Safari/537.36",
+            .sec_ch_ua_header = "sec-ch-ua: \" Not A;Brand\";v=\"99\", \"Chromium\";v=\"99\", \"Google Chrome\";v=\"99\"",
+            .sec_ch_ua_mobile_header = "sec-ch-ua-mobile: ?1",
+            .sec_ch_ua_platform_header = "sec-ch-ua-platform: \"Android\"",
+            .accept_language_header = "Accept-Language: en-US,en;q=0.9",
+            .navigator_platform = "Linux armv8l",
+            .navigator_vendor = "Google Inc.",
+            .navigator_app_version = "5.0 (Linux; Android 12; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.58 Mobile Safari/537.36",
+            .cdp_product = "Chrome/99.0.4844.58",
+            .cdp_user_agent = "Mozilla/5.0 (Linux; Android 12; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.58 Mobile Safari/537.36",
+        };
+    }
+    if (std.mem.eql(u8, fingerprint, "edge99")) {
+        return .{
+            .user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.51 Safari/537.36 Edg/99.0.1150.30",
+            .sec_ch_ua_header = "sec-ch-ua: \" Not A;Brand\";v=\"99\", \"Chromium\";v=\"99\", \"Microsoft Edge\";v=\"99\"",
+            .sec_ch_ua_mobile_header = "sec-ch-ua-mobile: ?0",
+            .sec_ch_ua_platform_header = "sec-ch-ua-platform: \"Windows\"",
+            .accept_language_header = "Accept-Language: en-US,en;q=0.9",
+            .navigator_platform = "Win32",
+            .navigator_vendor = "Google Inc.",
+            .navigator_app_version = "5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.51 Safari/537.36 Edg/99.0.1150.30",
+            .cdp_product = "Chrome/99.0.4844.51",
+            .cdp_user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.51 Safari/537.36 Edg/99.0.1150.30",
+        };
+    }
+    if (std.mem.eql(u8, fingerprint, "edge101")) {
+        return .{
+            .user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36 Edg/101.0.1210.47",
+            .sec_ch_ua_header = "sec-ch-ua: \" Not A;Brand\";v=\"99\", \"Chromium\";v=\"101\", \"Microsoft Edge\";v=\"101\"",
+            .sec_ch_ua_mobile_header = "sec-ch-ua-mobile: ?0",
+            .sec_ch_ua_platform_header = "sec-ch-ua-platform: \"Windows\"",
+            .accept_language_header = "Accept-Language: en-US,en;q=0.9",
+            .navigator_platform = "Win32",
+            .navigator_vendor = "Google Inc.",
+            .navigator_app_version = "5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36 Edg/101.0.1210.47",
+            .cdp_product = "Chrome/101.0.4951.64",
+            .cdp_user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36 Edg/101.0.1210.47",
+        };
+    }
+    if (std.mem.eql(u8, fingerprint, "safari15_3")) {
+        return .{
+            .user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 11_6_4) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.3 Safari/605.1.15",
+            .sec_ch_ua_header = "sec-ch-ua: \" Not A;Brand\";v=\"99\", \"Safari\";v=\"15\"",
+            .sec_ch_ua_mobile_header = "sec-ch-ua-mobile: ?0",
+            .sec_ch_ua_platform_header = "sec-ch-ua-platform: \"macOS\"",
+            .accept_language_header = "Accept-Language: en-US,en;q=0.9",
+            .navigator_platform = "MacIntel",
+            .navigator_vendor = "Apple Computer, Inc.",
+            .navigator_app_version = "5.0 (Macintosh; Intel Mac OS X 11_6_4) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.3 Safari/605.1.15",
+            .cdp_product = "Safari/15.3",
+            .cdp_user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 11_6_4) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.3 Safari/605.1.15",
+        };
+    }
+    if (std.mem.eql(u8, fingerprint, "safari15_5")) {
+        return .{
+            .user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 12_4) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.5 Safari/605.1.15",
+            .sec_ch_ua_header = "sec-ch-ua: \" Not A;Brand\";v=\"99\", \"Safari\";v=\"15\"",
+            .sec_ch_ua_mobile_header = "sec-ch-ua-mobile: ?0",
+            .sec_ch_ua_platform_header = "sec-ch-ua-platform: \"macOS\"",
+            .accept_language_header = "Accept-Language: en-US,en;q=0.9",
+            .navigator_platform = "MacIntel",
+            .navigator_vendor = "Apple Computer, Inc.",
+            .navigator_app_version = "5.0 (Macintosh; Intel Mac OS X 12_4) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.5 Safari/605.1.15",
+            .cdp_product = "Safari/15.5",
+            .cdp_user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 12_4) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.5 Safari/605.1.15",
+        };
+    }
+    return null;
+}
+
+fn browserProfileChrome(comptime full_version: []const u8, comptime major: []const u8, comptime cdp_version: []const u8) BrowserProfile {
+    const user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/" ++ full_version ++ " Safari/537.36";
+    const sec_ch_ua_header = if (std.mem.eql(u8, major, "99"))
+        "sec-ch-ua: \" Not A;Brand\";v=\"99\", \"Chromium\";v=\"99\", \"Google Chrome\";v=\"99\""
+    else if (std.mem.eql(u8, major, "100"))
+        "sec-ch-ua: \" Not A;Brand\";v=\"99\", \"Chromium\";v=\"100\", \"Google Chrome\";v=\"100\""
+    else if (std.mem.eql(u8, major, "101"))
+        "sec-ch-ua: \" Not A;Brand\";v=\"99\", \"Chromium\";v=\"101\", \"Google Chrome\";v=\"101\""
+    else if (std.mem.eql(u8, major, "104"))
+        "sec-ch-ua: \"Chromium\";v=\"104\", \" Not A;Brand\";v=\"99\", \"Google Chrome\";v=\"104\""
+    else if (std.mem.eql(u8, major, "107"))
+        "sec-ch-ua: \"Google Chrome\";v=\"107\", \"Chromium\";v=\"107\", \"Not=A?Brand\";v=\"24\""
+    else if (std.mem.eql(u8, major, "110"))
+        "sec-ch-ua: \"Chromium\";v=\"110\", \"Not A(Brand\";v=\"24\", \"Google Chrome\";v=\"110\""
+    else if (std.mem.eql(u8, major, "116"))
+        "sec-ch-ua: \"Chromium\";v=\"116\", \"Not)A;Brand\";v=\"24\", \"Google Chrome\";v=\"116\""
+    else
+        "sec-ch-ua: \"Chromium\";v=\"99\", \"Google Chrome\";v=\"99\", \" Not A;Brand\";v=\"99\"";
+
+    return .{
+        .user_agent = user_agent,
+        .sec_ch_ua_header = sec_ch_ua_header,
+        .sec_ch_ua_mobile_header = "sec-ch-ua-mobile: ?0",
+        .sec_ch_ua_platform_header = "sec-ch-ua-platform: \"Windows\"",
+        .accept_language_header = "Accept-Language: en-US,en;q=0.9",
+        .navigator_platform = "Win32",
+        .navigator_vendor = "Google Inc.",
+        .navigator_app_version = "5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/" ++ full_version ++ " Safari/537.36",
+        .cdp_product = "Chrome/" ++ cdp_version,
+        .cdp_user_agent = user_agent,
+    };
+}
 
 /// Pre-formatted HTTP headers for reuse across Http and Client.
 /// Must be initialized with an allocator that outlives all HTTP connections.
 pub const HttpHeaders = struct {
-    const user_agent_base: [:0]const u8 = "Lightpanda/1.0";
-
-    user_agent: [:0]const u8, // User agent value (e.g. "Lightpanda/1.0")
+    user_agent: [:0]const u8,
+    user_agent_is_allocated: bool,
     user_agent_header: [:0]const u8,
+    sec_ch_ua_header: [:0]const u8,
+    sec_ch_ua_mobile_header: [:0]const u8,
+    sec_ch_ua_platform_header: [:0]const u8,
+    accept_language_header: [:0]const u8,
+    navigator_platform: [:0]const u8,
+    navigator_vendor: [:0]const u8,
+    navigator_app_version: [:0]const u8,
+    cdp_product: [:0]const u8,
+    cdp_user_agent: [:0]const u8,
+    gpu_vendor: [:0]const u8,
+    gpu_renderer: [:0]const u8,
 
     proxy_bearer_header: ?[:0]const u8,
 
     pub fn init(allocator: Allocator, config: *const Config) !HttpHeaders {
+        const profile = config.browserProfile();
         const user_agent: [:0]const u8 = if (config.userAgentSuffix()) |suffix|
-            try std.fmt.allocPrintSentinel(allocator, "{s} {s}", .{ user_agent_base, suffix }, 0)
+            try std.fmt.allocPrintSentinel(allocator, "{s} {s}", .{ profile.user_agent, suffix }, 0)
         else
-            user_agent_base;
+            profile.user_agent;
         errdefer if (config.userAgentSuffix() != null) allocator.free(user_agent);
 
         const user_agent_header = try std.fmt.allocPrintSentinel(allocator, "User-Agent: {s}", .{user_agent}, 0);
@@ -212,9 +443,23 @@ pub const HttpHeaders = struct {
         else
             null;
 
+        const gpu = randomGpuProfile();
+
         return .{
             .user_agent = user_agent,
+            .user_agent_is_allocated = config.userAgentSuffix() != null,
             .user_agent_header = user_agent_header,
+            .sec_ch_ua_header = profile.sec_ch_ua_header,
+            .sec_ch_ua_mobile_header = profile.sec_ch_ua_mobile_header,
+            .sec_ch_ua_platform_header = profile.sec_ch_ua_platform_header,
+            .accept_language_header = profile.accept_language_header,
+            .navigator_platform = profile.navigator_platform,
+            .navigator_vendor = profile.navigator_vendor,
+            .navigator_app_version = profile.navigator_app_version,
+            .cdp_product = profile.cdp_product,
+            .cdp_user_agent = profile.cdp_user_agent,
+            .gpu_vendor = gpu.vendor,
+            .gpu_renderer = gpu.renderer,
             .proxy_bearer_header = proxy_bearer_header,
         };
     }
@@ -224,7 +469,7 @@ pub const HttpHeaders = struct {
             allocator.free(hdr);
         }
         allocator.free(self.user_agent_header);
-        if (self.user_agent.ptr != user_agent_base.ptr) {
+        if (self.user_agent_is_allocated) {
             allocator.free(self.user_agent);
         }
     }
@@ -291,6 +536,12 @@ pub fn printUsageAndExit(self: *const Config, success: bool) void {
         \\
         \\--user_agent_suffix
         \\                Suffix to append to the Lightpanda/X.Y User-Agent
+        \\
+        \\--browser       Browser fingerprint used by curl-impersonate.
+        \\                Supported: chrome99,chrome100,chrome101,chrome104,
+        \\                chrome107,chrome110,chrome116,chrome99_android,
+        \\                edge99,edge101,safari15_3,safari15_5.
+        \\                If omitted, a random chrome/edge fingerprint is used.
         \\
     ;
 
@@ -796,5 +1047,44 @@ fn parseCommonArg(
         return true;
     }
 
+    if (std.mem.eql(u8, "--browser", opt)) {
+        const str = args.next() orelse {
+            log.fatal(.app, "missing argument value", .{ .arg = "--browser" });
+            return error.InvalidArgument;
+        };
+
+        if (!isSupportedBrowserFingerprint(str)) {
+            log.fatal(.app, "invalid option choice", .{ .arg = "--browser", .value = str });
+            return error.InvalidArgument;
+        }
+
+        common.browser = try allocator.dupeZ(u8, str);
+        return true;
+    }
+
     return false;
+}
+
+test "config: default browser fingerprint remains stable per process config" {
+    const allocator = std.testing.allocator;
+
+    var config = try Config.init(allocator, "test", .{ .serve = .{} });
+    defer config.deinit(allocator);
+
+    const selected = config.browserFingerprint();
+    try std.testing.expect(isSupportedBrowserFingerprint(selected));
+
+    for (0..32) |_| {
+        try std.testing.expectEqualStrings(selected, config.browserFingerprint());
+    }
+}
+
+test "config: explicit browser fingerprint overrides default" {
+    const allocator = std.testing.allocator;
+
+    var config = try Config.init(allocator, "test", .{ .serve = .{ .common = .{ .browser = "chrome116" } } });
+    defer config.deinit(allocator);
+
+    try std.testing.expectEqualStrings("chrome116", config.browserFingerprint());
+    try std.testing.expectEqualStrings("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.5845.180 Safari/537.36", config.browserProfile().user_agent);
 }

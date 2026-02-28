@@ -196,3 +196,16 @@
     testing.expectEqual(true, response.body !== null);
   });
 </script>
+
+<script id=fetch_protocol_error_shape>
+  testing.async(async (restore) => {
+    try {
+      await fetch('chrome-extension://ghbmnnjooekpmoecnnnilnnbdlolhkhi/page_embed_script.js');
+      testing.expectEqual(true, false);
+    } catch (err) {
+      restore();
+      testing.expectEqual('TypeError', err.name);
+      testing.expectEqual(true, String(err.message).includes('Failed to fetch'));
+    }
+  });
+</script>

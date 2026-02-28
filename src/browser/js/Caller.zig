@@ -153,10 +153,14 @@ pub fn method(self: *Caller, comptime T: type, func: anytype, handle: *const v8.
 
 fn _method(self: *Caller, comptime T: type, func: anytype, info: FunctionCallbackInfo, comptime opts: CallOpts) !void {
     const F = @TypeOf(func);
-    var args = try self.getArgs(F, 1, info);
-
     const js_this = info.getThis();
-    @field(args, "0") = try TaggedOpaque.fromJS(*T, js_this);
+    const zig_this = TaggedOpaque.fromJS(*T, js_this) catch |err| switch (err) {
+        error.InvalidArgument => return error.IllegalInvocation,
+        else => return err,
+    };
+
+    var args = try self.getArgs(F, 1, info);
+    @field(args, "0") = zig_this;
 
     const res = @call(.auto, func, args);
 
@@ -199,7 +203,10 @@ pub fn getIndex(self: *Caller, comptime T: type, func: anytype, idx: u32, handle
 fn _getIndex(self: *Caller, comptime T: type, func: anytype, idx: u32, info: PropertyCallbackInfo, comptime opts: CallOpts) !u8 {
     const F = @TypeOf(func);
     var args = try self.getArgs(F, 2, info);
-    @field(args, "0") = try TaggedOpaque.fromJS(*T, info.getThis());
+    @field(args, "0") = TaggedOpaque.fromJS(*T, info.getThis()) catch |err| switch (err) {
+        error.InvalidArgument => return error.IllegalInvocation,
+        else => return err,
+    };
     @field(args, "1") = idx;
     const ret = @call(.auto, func, args);
     return self.handleIndexedReturn(T, F, true, ret, info, opts);
@@ -221,7 +228,10 @@ pub fn getNamedIndex(self: *Caller, comptime T: type, func: anytype, name: *cons
 fn _getNamedIndex(self: *Caller, comptime T: type, func: anytype, name: *const v8.Name, info: PropertyCallbackInfo, comptime opts: CallOpts) !u8 {
     const F = @TypeOf(func);
     var args = try self.getArgs(F, 2, info);
-    @field(args, "0") = try TaggedOpaque.fromJS(*T, info.getThis());
+    @field(args, "0") = TaggedOpaque.fromJS(*T, info.getThis()) catch |err| switch (err) {
+        error.InvalidArgument => return error.IllegalInvocation,
+        else => return err,
+    };
     @field(args, "1") = try self.nameToString(@TypeOf(args.@"1"), name);
     const ret = @call(.auto, func, args);
     return self.handleIndexedReturn(T, F, true, ret, info, opts);
@@ -243,7 +253,10 @@ pub fn setNamedIndex(self: *Caller, comptime T: type, func: anytype, name: *cons
 fn _setNamedIndex(self: *Caller, comptime T: type, func: anytype, name: *const v8.Name, js_value: js.Value, info: PropertyCallbackInfo, comptime opts: CallOpts) !u8 {
     const F = @TypeOf(func);
     var args: ParameterTypes(F) = undefined;
-    @field(args, "0") = try TaggedOpaque.fromJS(*T, info.getThis());
+    @field(args, "0") = TaggedOpaque.fromJS(*T, info.getThis()) catch |err| switch (err) {
+        error.InvalidArgument => return error.IllegalInvocation,
+        else => return err,
+    };
     @field(args, "1") = try self.nameToString(@TypeOf(args.@"1"), name);
     @field(args, "2") = try self.local.jsValueToZig(@TypeOf(@field(args, "2")), js_value);
     if (@typeInfo(F).@"fn".params.len == 4) {
@@ -268,7 +281,10 @@ pub fn deleteNamedIndex(self: *Caller, comptime T: type, func: anytype, name: *c
 fn _deleteNamedIndex(self: *Caller, comptime T: type, func: anytype, name: *const v8.Name, info: PropertyCallbackInfo, comptime opts: CallOpts) !u8 {
     const F = @TypeOf(func);
     var args: ParameterTypes(F) = undefined;
-    @field(args, "0") = try TaggedOpaque.fromJS(*T, info.getThis());
+    @field(args, "0") = TaggedOpaque.fromJS(*T, info.getThis()) catch |err| switch (err) {
+        error.InvalidArgument => return error.IllegalInvocation,
+        else => return err,
+    };
     @field(args, "1") = try self.nameToString(@TypeOf(args.@"1"), name);
     if (@typeInfo(F).@"fn".params.len == 3) {
         @field(args, "2") = self.local.ctx.page;
@@ -337,6 +353,12 @@ fn handleError(self: *Caller, comptime T: type, comptime F: type, err: anyerror,
     const js_err: *const v8.Value = switch (err) {
         error.TryCatchRethrow => return,
         error.InvalidArgument => isolate.createTypeError("invalid argument"),
+        error.IllegalInvocation => isolate.createTypeError("Illegal invocation"),
+        error.CanvasGetImageDataRequiresFourArguments => isolate.createTypeError("Failed to execute 'getImageData' on 'CanvasRenderingContext2D': 4 arguments required, but only 1 present."),
+        error.WebSocketInvalidURL => isolate.createTypeError("Failed to construct 'WebSocket': The URL is invalid."),
+        error.ChromeRuntimeConnectRequiresExtensionId => isolate.createTypeError("Error in invocation of runtime.connect(optional string extensionId, optional object connectInfo): chrome.runtime.connect() called from a webpage must specify an Extension ID (string) for its first argument."),
+        error.ChromeRuntimeSendMessageRequiresExtensionId => isolate.createTypeError("Error in invocation of runtime.sendMessage(optional string extensionId, any message, optional object options, optional function responseCallback): chrome.runtime.sendMessage() called from a webpage must specify an Extension ID (string) for its first argument."),
+        error.ChromeRuntimeApiNotSupported => isolate.createTypeError("chrome.runtime API is not available in this context"),
         error.OutOfMemory => isolate.createError("out of memory"),
         error.IllegalConstructor => isolate.createError("Illegal Contructor"),
         else => blk: {
@@ -439,10 +461,17 @@ fn getArgs(self: *const Caller, comptime F: type, comptime offset: usize, info: 
         if (comptime isPage(param.type.?)) {
             @compileError("Page must be the last parameter (or 2nd last if there's a JsThis): " ++ @typeName(F));
         } else if (i >= js_parameter_count) {
-            if (@typeInfo(param.type.?) != .optional) {
-                return error.InvalidArgument;
+            if (param.type.? == js.Value) {
+                @field(args, tupleFieldName(field_index)) = js.Value{
+                    .local = local,
+                    .handle = local.isolate.initUndefined(),
+                };
+            } else {
+                if (@typeInfo(param.type.?) != .optional) {
+                    return error.InvalidArgument;
+                }
+                @field(args, tupleFieldName(field_index)) = null;
             }
-            @field(args, tupleFieldName(field_index)) = null;
         } else {
             const js_val = info.getArg(@intCast(i), local);
             @field(args, tupleFieldName(field_index)) = local.jsValueToZig(param.type.?, js_val) catch {

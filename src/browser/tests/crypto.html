@@ -59,6 +59,16 @@
   testing.expectEqual(true, crypto.subtle instanceof SubtleCrypto);
 </script>
 
+<script id=digest>
+  testing.async(async () => {
+    const payload = new TextEncoder().encode('abc');
+    const hash = await crypto.subtle.digest('SHA-256', payload);
+
+    testing.expectEqual(true, hash instanceof ArrayBuffer);
+    testing.expectEqual(32, hash.byteLength);
+  });
+</script>
+
 <script id=sign-and-verify-hmac>
   testing.async(async () => {
     let key = await crypto.subtle.generateKey(

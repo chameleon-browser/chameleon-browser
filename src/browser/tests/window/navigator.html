@@ -5,9 +5,9 @@
   // Navigator should be accessible from window
   testing.expectEqual(navigator, window.navigator);
   testing.expectEqual(true, navigator.userAgent.length > 0);
-  testing.expectEqual(true, navigator.userAgent.includes('Lightpanda'));
+  testing.expectEqual(true, navigator.userAgent.includes('Mozilla/5.0'));
   testing.expectEqual('Netscape', navigator.appName);
-  testing.expectEqual('1.0', navigator.appVersion);
+  testing.expectEqual(true, navigator.appVersion.length > 0);
   testing.expectEqual(true, navigator.platform.length > 0);
 
   // Platform should be one of the known values
@@ -22,8 +22,34 @@
   testing.expectEqual(true, navigator.hardwareConcurrency > 0);
   testing.expectEqual(4, navigator.hardwareConcurrency);
   testing.expectEqual(0, navigator.maxTouchPoints);
-  testing.expectEqual('', navigator.vendor);
+  testing.expectEqual(true, navigator.vendor.length > 0);
   testing.expectEqual('Gecko', navigator.product);
   testing.expectEqual(false, navigator.javaEnabled());
-  testing.expectEqual(false, navigator.webdriver);
+  testing.expectEqual(false, 'webdriver' in navigator);
+  testing.expectEqual(undefined, navigator.webdriver);
+  testing.expectEqual('object', typeof navigator.mimeTypes);
+  testing.expectEqual(true, navigator.mimeTypes.length > 0);
+  testing.expectEqual('object', typeof navigator.permissions);
+  testing.expectEqual('function', typeof navigator.sendBeacon);
+  testing.expectEqual(true, navigator.sendBeacon('/collect'));
+  testing.expectEqual('object', typeof window.chrome);
+  testing.expectEqual('object', typeof window.chrome.runtime);
+  testing.expectEqual('function', typeof OfflineAudioContext);
+  testing.expectEqual('function', typeof webkitOfflineAudioContext);
+
+  try {
+    window.chrome.runtime.connect();
+    testing.expectEqual(true, false);
+  } catch (err) {
+    testing.expectEqual('string', typeof err.message);
+    testing.expectEqual(true, err.message.includes('runtime.connect'));
+    testing.expectEqual(true, err.message.length > 40);
+  }
+
+  // userAgentData
+  testing.expectEqual('object', typeof navigator.userAgentData);
+  testing.expectEqual(true, Array.isArray(navigator.userAgentData.brands));
+  testing.expectEqual(true, navigator.userAgentData.brands.length > 0);
+  testing.expectEqual('boolean', typeof navigator.userAgentData.mobile);
+  testing.expectEqual(true, navigator.userAgentData.platform.length > 0);
 </script>

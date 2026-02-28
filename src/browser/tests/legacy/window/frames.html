@@ -10,3 +10,25 @@
   testing.expectEqual(2, frames.length);
   testing.expectEqual(undefined, frames[3])
 </script>
+
+<script id=iframe_content_window_identity>
+  const iframe = document.createElement('iframe');
+  iframe.src = 'about:blank';
+  document.body.appendChild(iframe);
+
+  testing.expectEqual(false, iframe.contentWindow === window);
+  testing.expectEqual(window, iframe.contentWindow.top);
+  testing.expectEqual(window, iframe.contentWindow.parent);
+  testing.expectEqual(iframe, iframe.contentWindow.frameElement);
+  testing.expectEqual(iframe.contentWindow, iframe.contentWindow.frames);
+  testing.expectEqual('function', typeof iframe.contentWindow.atob);
+  testing.expectEqual('function', typeof iframe.contentWindow.scrollTo);
+  testing.expectEqual('number', typeof iframe.contentWindow.outerWidth);
+  testing.expectEqual('number', typeof iframe.contentWindow.devicePixelRatio);
+  testing.expectEqual(false, iframe.contentWindow.setTimeout === window.setTimeout);
+  testing.expectEqual(false, iframe.contentWindow.navigator === window.navigator);
+  testing.expectEqual(false, iframe.contentWindow.chrome === window.chrome);
+  testing.expectEqual(false, 'webdriver' in iframe.contentWindow.navigator);
+
+  iframe.remove();
+</script>

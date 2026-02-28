@@ -152,6 +152,66 @@ pub fn deriveBits(
     };
 }
 
+const DigestAlgorithm = union(enum) {
+    string: []const u8,
+    object: struct { name: []const u8 },
+
+    pub fn name(self: DigestAlgorithm) []const u8 {
+        return switch (self) {
+            .string => |s| s,
+            .object => |o| o.name,
+        };
+    }
+};
+
+/// Computes a digest for the provided data.
+pub fn digest(
+    _: *const SubtleCrypto,
+    algorithm: DigestAlgorithm,
+    data: []const u8,
+    page: *Page,
+) !js.Promise {
+    const name = algorithm.name();
+
+    const hashed = blk: {
+        if (std.mem.eql(u8, name, "SHA-1")) {
+            var out: [20]u8 = undefined;
+            var hasher = std.crypto.hash.Sha1.init(.{});
+            hasher.update(data);
+            hasher.final(&out);
+            break :blk try page.call_arena.dupe(u8, &out);
+        }
+
+        if (std.mem.eql(u8, name, "SHA-256")) {
+            var out: [32]u8 = undefined;
+            var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+            hasher.update(data);
+            hasher.final(&out);
+            break :blk try page.call_arena.dupe(u8, &out);
+        }
+
+        if (std.mem.eql(u8, name, "SHA-384")) {
+            var out: [48]u8 = undefined;
+            var hasher = std.crypto.hash.sha2.Sha384.init(.{});
+            hasher.update(data);
+            hasher.final(&out);
+            break :blk try page.call_arena.dupe(u8, &out);
+        }
+
+        if (std.mem.eql(u8, name, "SHA-512")) {
+            var out: [64]u8 = undefined;
+            var hasher = std.crypto.hash.sha2.Sha512.init(.{});
+            hasher.update(data);
+            hasher.final(&out);
+            break :blk try page.call_arena.dupe(u8, &out);
+        }
+
+        return page.js.local.?.rejectPromise(@errorName(error.NotSupported));
+    };
+
+    return page.js.local.?.resolvePromise(js.ArrayBuffer{ .values = hashed });
+}
+
 const SignatureAlgorithm = union(enum) {
     string: []const u8,
     object: struct { name: []const u8 },
@@ -354,7 +414,7 @@ pub const CryptoKey = struct {
             .object => |obj| obj.name,
         };
         // Find digest.
-        const digest = try findDigest(hash);
+        const md = try findDigest(hash);
 
         // We need at least a single usage.
         if (key_usages.len == 0) {
@@ -380,7 +440,7 @@ pub const CryptoKey = struct {
                 break :blk length / 8;
             }
             // Prefer block size of the hash function instead.
-            break :blk crypto.EVP_MD_block_size(digest);
+            break :blk crypto.EVP_MD_block_size(md);
         };
 
         const key = try page.arena.alloc(u8, block_size);
@@ -395,7 +455,7 @@ pub const CryptoKey = struct {
             ._extractable = extractable,
             ._usages = usages_mask,
             ._key = key,
-            ._vary = .{ .digest = digest },
+            ._vary = .{ .digest = md },
         });
 
         return .{ .key = crypto_key };
@@ -632,6 +692,7 @@ pub const JsApi = struct {
 
     pub const generateKey = bridge.function(SubtleCrypto.generateKey, .{ .dom_exception = true });
     pub const exportKey = bridge.function(SubtleCrypto.exportKey, .{ .dom_exception = true });
+    pub const digest = bridge.function(SubtleCrypto.digest, .{ .dom_exception = true });
     pub const sign = bridge.function(SubtleCrypto.sign, .{ .dom_exception = true });
     pub const verify = bridge.function(SubtleCrypto.verify, .{ .dom_exception = true });
     pub const deriveBits = bridge.function(SubtleCrypto.deriveBits, .{ .dom_exception = true });

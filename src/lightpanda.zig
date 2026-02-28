@@ -93,6 +93,10 @@ pub fn fetch(app: *App, url: [:0]const u8, opts: FetchOpts) !void {
     });
     _ = session.wait(opts.wait_ms);
 
+    if (page.lastWaitError()) |err| {
+        return err;
+    }
+
     const writer = opts.writer orelse return;
     try dump.root(page.window._document, opts.dump, writer, page);
     try writer.flush();

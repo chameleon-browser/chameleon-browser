@@ -82,6 +82,15 @@ pub fn getNamed(self: *CSSStyleProperties, name: []const u8, page: *Page) ![]con
     return value;
 }
 
+pub fn setNamed(self: *CSSStyleProperties, name: []const u8, value: []const u8, page: *Page) !void {
+    if (method_names.has(name)) {
+        return error.NotHandled;
+    }
+
+    const dash_case = camelCaseToDashCase(name, &page.buf);
+    try self._proto.setProperty(dash_case, value, null, page);
+}
+
 fn isKnownCSSProperty(dash_case: []const u8) bool {
     // List of common/known CSS properties
     // In a full implementation, this would include all standard CSS properties
@@ -89,6 +98,9 @@ fn isKnownCSSProperty(dash_case: []const u8) bool {
         .{ "color", {} },
         .{ "background-color", {} },
         .{ "font-size", {} },
+        .{ "font-family", {} },
+        .{ "font-style", {} },
+        .{ "font-weight", {} },
         .{ "margin-top", {} },
         .{ "margin-bottom", {} },
         .{ "margin-left", {} },
@@ -201,5 +213,5 @@ pub const JsApi = struct {
         pub var class_id: bridge.ClassId = undefined;
     };
 
-    pub const @"[]" = bridge.namedIndexed(CSSStyleProperties.getNamed, null, null, .{});
+    pub const @"[]" = bridge.namedIndexed(CSSStyleProperties.getNamed, CSSStyleProperties.setNamed, null, .{});
 };

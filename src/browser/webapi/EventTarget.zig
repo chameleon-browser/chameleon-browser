@@ -38,11 +38,13 @@ pub const Type = union(enum) {
     abort_signal: *@import("AbortSignal.zig"),
     media_query_list: *@import("css/MediaQueryList.zig"),
     message_port: *@import("MessagePort.zig"),
+    iframe_window: *@import("element/html/IFrame.zig").ContentWindow,
     text_track_cue: *@import("media/TextTrackCue.zig"),
     navigation: *@import("navigation/NavigationEventTarget.zig"),
     screen: *@import("Screen.zig"),
     screen_orientation: *@import("Screen.zig").Orientation,
     visual_viewport: *@import("VisualViewport.zig"),
+    notification: *@import("Notification.zig"),
 };
 
 pub fn init(page: *Page) !*EventTarget {
@@ -129,11 +131,13 @@ pub fn format(self: *EventTarget, writer: *std.Io.Writer) !void {
         .abort_signal => writer.writeAll("<AbortSignal>"),
         .media_query_list => writer.writeAll("<MediaQueryList>"),
         .message_port => writer.writeAll("<MessagePort>"),
+        .iframe_window => writer.writeAll("<Window>"),
         .text_track_cue => writer.writeAll("<TextTrackCue>"),
         .navigation => writer.writeAll("<Navigation>"),
         .screen => writer.writeAll("<Screen>"),
         .screen_orientation => writer.writeAll("<ScreenOrientation>"),
         .visual_viewport => writer.writeAll("<VisualViewport>"),
+        .notification => writer.writeAll("<Notification>"),
     };
 }
 
@@ -146,11 +150,13 @@ pub fn toString(self: *EventTarget) []const u8 {
         .abort_signal => return "[object AbortSignal]",
         .media_query_list => return "[object MediaQueryList]",
         .message_port => return "[object MessagePort]",
+        .iframe_window => return "[object Window]",
         .text_track_cue => return "[object TextTrackCue]",
         .navigation => return "[object Navigation]",
         .screen => return "[object Screen]",
         .screen_orientation => return "[object ScreenOrientation]",
         .visual_viewport => return "[object VisualViewport]",
+        .notification => return "[object Notification]",
     };
 }
 

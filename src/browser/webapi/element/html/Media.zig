@@ -95,9 +95,10 @@ pub fn as(self: *Media, comptime T: type) *T {
     return self.is(T).?;
 }
 
-pub fn canPlayType(_: *const Media, mime_type: []const u8, page: *Page) []const u8 {
-    const pos = std.mem.indexOfScalar(u8, mime_type, ';') orelse mime_type.len;
-    const base_type = std.mem.trim(u8, mime_type[0..pos], &std.ascii.whitespace);
+pub fn canPlayType(_: *const Media, mime_type: js.Value, page: *Page) []const u8 {
+    const mime_type_slice = mime_type.toStringSliceWithAlloc(page.call_arena) catch return "";
+    const pos = std.mem.indexOfScalar(u8, mime_type_slice, ';') orelse mime_type_slice.len;
+    const base_type = std.mem.trim(u8, mime_type_slice[0..pos], &std.ascii.whitespace);
 
     if (base_type.len > page.buf.len) {
         return "";

@@ -167,12 +167,27 @@ pub const Extension = union(enum) {
     };
 };
 
-/// This actually takes "GLenum" which, in fact, is a fancy way to say number.
-/// Return value also depends on what's being passed as `pname`; we don't really
-/// support any though.
-pub fn getParameter(_: *const WebGLRenderingContext, pname: u32) []const u8 {
-    _ = pname;
-    return "";
+/// WebGL parameter constants
+const GL_VENDOR: u32 = 0x1F00;
+const GL_RENDERER: u32 = 0x1F01;
+const GL_VERSION: u32 = 0x1F02;
+const GL_SHADING_LANGUAGE_VERSION: u32 = 0x8B8C;
+const GL_UNMASKED_VENDOR_WEBGL: u32 = 0x9245;
+const GL_UNMASKED_RENDERER_WEBGL: u32 = 0x9246;
+
+/// Returns the value of the specified WebGL parameter.
+/// GPU vendor/renderer are read from the session's randomly-selected GPU profile,
+/// ensuring they stay consistent within a browser instance.
+pub fn getParameter(_: *const WebGLRenderingContext, pname: u32, page: *Page) []const u8 {
+    return switch (pname) {
+        GL_VENDOR => "WebKit",
+        GL_RENDERER => "WebKit WebGL",
+        GL_VERSION => "WebGL 1.0 (OpenGL ES 2.0 Chromium)",
+        GL_SHADING_LANGUAGE_VERSION => "WebGL GLSL ES 1.0 (OpenGL ES GLSL ES 1.0 Chromium)",
+        GL_UNMASKED_VENDOR_WEBGL => page._session.gpuVendor(),
+        GL_UNMASKED_RENDERER_WEBGL => page._session.gpuRenderer(),
+        else => "",
+    };
 }
 
 /// Enables a WebGL extension.
@@ -197,6 +212,38 @@ pub fn getSupportedExtensions(_: *const WebGLRenderingContext) []const []const u
     return std.meta.fieldNames(Extension.Kind);
 }
 
+// ---------------------------------------------------------------------------
+// Stub WebGL drawing methods — enough for fingerprint scripts to run without
+// crashing. No actual rendering occurs; toDataURL returns a deterministic PNG.
+// ---------------------------------------------------------------------------
+pub fn createShader(_: *WebGLRenderingContext, _: u32) u32 {
+    return 1;
+}
+pub fn shaderSource(_: *WebGLRenderingContext, _: u32, _: []const u8) void {}
+pub fn compileShader(_: *WebGLRenderingContext, _: u32) void {}
+pub fn createProgram(_: *WebGLRenderingContext) u32 {
+    return 1;
+}
+pub fn attachShader(_: *WebGLRenderingContext, _: u32, _: u32) void {}
+pub fn linkProgram(_: *WebGLRenderingContext, _: u32) void {}
+pub fn useProgram(_: *WebGLRenderingContext, _: u32) void {}
+pub fn createBuffer(_: *WebGLRenderingContext) u32 {
+    return 1;
+}
+pub fn bindBuffer(_: *WebGLRenderingContext, _: u32, _: u32) void {}
+pub fn enableVertexAttribArray(_: *WebGLRenderingContext, _: u32) void {}
+pub fn vertexAttribPointer(_: *WebGLRenderingContext, _: u32, _: u32, _: u32, _: bool, _: u32, _: u32) void {}
+pub fn getAttribLocation(_: *WebGLRenderingContext, _: u32, _: []const u8) i32 {
+    return 0;
+}
+pub fn clearColor(_: *WebGLRenderingContext, _: f64, _: f64, _: f64, _: f64) void {}
+pub fn clear(_: *WebGLRenderingContext, _: u32) void {}
+pub fn drawArrays(_: *WebGLRenderingContext, _: u32, _: u32, _: u32) void {}
+// NOTE: "bufferData" cannot be exposed as a bridge function — the exact name causes
+// a mysterious V8 runtime failure where Castle.js crashes (TypeError in minified code).
+// All other names (bufferDat, bufferDataa, xbufferData, etc.) work fine.
+// The WebGL fingerprint image falls back to "undefined" without this.
+
 pub const JsApi = struct {
     pub const bridge = js.Bridge(WebGLRenderingContext);
 
@@ -210,6 +257,40 @@ pub const JsApi = struct {
     pub const getParameter = bridge.function(WebGLRenderingContext.getParameter, .{});
     pub const getExtension = bridge.function(WebGLRenderingContext.getExtension, .{});
     pub const getSupportedExtensions = bridge.function(WebGLRenderingContext.getSupportedExtensions, .{});
+    pub const createShader = bridge.function(WebGLRenderingContext.createShader, .{});
+    pub const shaderSource = bridge.function(WebGLRenderingContext.shaderSource, .{});
+    pub const compileShader = bridge.function(WebGLRenderingContext.compileShader, .{});
+    pub const createProgram = bridge.function(WebGLRenderingContext.createProgram, .{});
+    pub const attachShader = bridge.function(WebGLRenderingContext.attachShader, .{});
+    pub const linkProgram = bridge.function(WebGLRenderingContext.linkProgram, .{});
+    pub const useProgram = bridge.function(WebGLRenderingContext.useProgram, .{});
+    pub const createBuffer = bridge.function(WebGLRenderingContext.createBuffer, .{});
+    pub const bindBuffer = bridge.function(WebGLRenderingContext.bindBuffer, .{});
+    pub const enableVertexAttribArray = bridge.function(WebGLRenderingContext.enableVertexAttribArray, .{});
+    pub const vertexAttribPointer = bridge.function(WebGLRenderingContext.vertexAttribPointer, .{});
+    pub const getAttribLocation = bridge.function(WebGLRenderingContext.getAttribLocation, .{});
+    pub const clearColor = bridge.function(WebGLRenderingContext.clearColor, .{});
+    pub const clear = bridge.function(WebGLRenderingContext.clear, .{});
+    pub const drawArrays = bridge.function(WebGLRenderingContext.drawArrays, .{});
+
+    // WebGL constants
+    pub const VERTEX_SHADER = bridge.property(@as(u32, 0x8B31), .{ .template = false });
+    pub const FRAGMENT_SHADER = bridge.property(@as(u32, 0x8B30), .{ .template = false });
+    pub const ARRAY_BUFFER = bridge.property(@as(u32, 0x8892), .{ .template = false });
+    pub const STATIC_DRAW = bridge.property(@as(u32, 0x88E4), .{ .template = false });
+    pub const FLOAT = bridge.property(@as(u32, 0x1406), .{ .template = false });
+    pub const COLOR_BUFFER_BIT = bridge.property(@as(u32, 0x4000), .{ .template = false });
+    pub const TRIANGLES = bridge.property(@as(u32, 0x0004), .{ .template = false });
+    pub const LINES = bridge.property(@as(u32, 0x0001), .{ .template = false });
+    pub const DEPTH_BUFFER_BIT = bridge.property(@as(u32, 0x0100), .{ .template = false });
+    pub const BLEND = bridge.property(@as(u32, 0x0BE2), .{ .template = false });
+    pub const SRC_ALPHA = bridge.property(@as(u32, 0x0302), .{ .template = false });
+    pub const ONE_MINUS_SRC_ALPHA = bridge.property(@as(u32, 0x0303), .{ .template = false });
+    pub const DEPTH_TEST = bridge.property(@as(u32, 0x0B71), .{ .template = false });
+    pub const LINE_STRIP = bridge.property(@as(u32, 0x0003), .{ .template = false });
+    pub const TRIANGLE_STRIP = bridge.property(@as(u32, 0x0005), .{ .template = false });
+    pub const TRIANGLE_FAN = bridge.property(@as(u32, 0x0006), .{ .template = false });
+    pub const POINTS = bridge.property(@as(u32, 0x0000), .{ .template = false });
 };
 
 const testing = @import("../../../testing.zig");

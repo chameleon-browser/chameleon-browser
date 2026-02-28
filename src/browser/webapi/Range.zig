@@ -23,6 +23,7 @@ const Page = @import("../Page.zig");
 const Node = @import("Node.zig");
 const DocumentFragment = @import("DocumentFragment.zig");
 const AbstractRange = @import("AbstractRange.zig");
+const DOMRect = @import("DOMRect.zig");
 
 const Range = @This();
 
@@ -535,6 +536,62 @@ pub fn toString(self: *const Range, page: *Page) ![]const u8 {
     return buf.written();
 }
 
+fn rectForNode(node: *Node, page: *Page) !*DOMRect {
+    if (node.is(Node.Element)) |elem| {
+        return elem.getBoundingClientRect(page);
+    }
+
+    if (node.parentNode()) |parent| {
+        if (parent.is(Node.Element)) |elem| {
+            return elem.getBoundingClientRect(page);
+        }
+    }
+
+    return page._factory.create(DOMRect{
+        ._x = 0.0,
+        ._y = 0.0,
+        ._width = 0.0,
+        ._height = 0.0,
+    });
+}
+
+pub fn getBoundingClientRect(self: *const Range, page: *Page) !*DOMRect {
+    if (self._proto.getCollapsed()) {
+        return page._factory.create(DOMRect{
+            ._x = 0.0,
+            ._y = 0.0,
+            ._width = 0.0,
+            ._height = 0.0,
+        });
+    }
+
+    const start_rect = try rectForNode(self._proto._start_container, page);
+    const end_rect = try rectForNode(self._proto._end_container, page);
+
+    const left = @min(start_rect.getLeft(), end_rect.getLeft());
+    const top = @min(start_rect.getTop(), end_rect.getTop());
+    const right = @max(start_rect.getRight(), end_rect.getRight());
+    const bottom = @max(start_rect.getBottom(), end_rect.getBottom());
+
+    return page._factory.create(DOMRect{
+        ._x = left,
+        ._y = top,
+        ._width = right - left,
+        ._height = bottom - top,
+    });
+}
+
+pub fn getClientRects(self: *const Range, page: *Page) ![]*DOMRect {
+    if (self._proto.getCollapsed()) {
+        return &.{};
+    }
+
+    const rect = try self.getBoundingClientRect(page);
+    const out = try page.call_arena.alloc(*DOMRect, 1);
+    out[0] = rect;
+    return out;
+}
+
 fn writeTextContent(self: *const Range, writer: *std.Io.Writer) !void {
     if (self._proto.getCollapsed()) {
         return;
@@ -592,6 +649,8 @@ pub const JsApi = struct {
     pub const extractContents = bridge.function(Range.extractContents, .{ .dom_exception = true });
     pub const surroundContents = bridge.function(Range.surroundContents, .{ .dom_exception = true });
     pub const createContextualFragment = bridge.function(Range.createContextualFragment, .{ .dom_exception = true });
+    pub const getBoundingClientRect = bridge.function(Range.getBoundingClientRect, .{});
+    pub const getClientRects = bridge.function(Range.getClientRects, .{});
     pub const toString = bridge.function(Range.toString, .{ .dom_exception = true });
 };
 

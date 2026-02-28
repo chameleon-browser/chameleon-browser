@@ -62,6 +62,17 @@ history: History,
 navigation: Navigation,
 
 page: ?Page,
+user_agent_override: ?[:0]const u8 = null,
+user_agent_header_override: ?[:0]const u8 = null,
+sec_ch_ua_header_override: ?[:0]const u8 = null,
+sec_ch_ua_mobile_header_override: ?[:0]const u8 = null,
+sec_ch_ua_platform_header_override: ?[:0]const u8 = null,
+accept_language_header_override: ?[:0]const u8 = null,
+navigator_platform_override: ?[:0]const u8 = null,
+navigator_vendor_override: ?[:0]const u8 = null,
+navigator_app_version_override: ?[:0]const u8 = null,
+cdp_product_override: ?[:0]const u8 = null,
+cdp_user_agent_override: ?[:0]const u8 = null,
 
 pub fn init(self: *Session, browser: *Browser, notification: *Notification) !void {
     const allocator = browser.app.allocator;
@@ -129,6 +140,58 @@ pub fn removePage(self: *Session) void {
 
 pub fn currentPage(self: *Session) ?*Page {
     return &(self.page orelse return null);
+}
+
+pub fn userAgent(self: *const Session) [:0]const u8 {
+    return self.user_agent_override orelse self.browser.app.config.http_headers.user_agent;
+}
+
+pub fn userAgentHeader(self: *const Session) [:0]const u8 {
+    return self.user_agent_header_override orelse self.browser.app.config.http_headers.user_agent_header;
+}
+
+pub fn secChUaHeader(self: *const Session) [:0]const u8 {
+    return self.sec_ch_ua_header_override orelse self.browser.app.config.http_headers.sec_ch_ua_header;
+}
+
+pub fn secChUaMobileHeader(self: *const Session) [:0]const u8 {
+    return self.sec_ch_ua_mobile_header_override orelse self.browser.app.config.http_headers.sec_ch_ua_mobile_header;
+}
+
+pub fn secChUaPlatformHeader(self: *const Session) [:0]const u8 {
+    return self.sec_ch_ua_platform_header_override orelse self.browser.app.config.http_headers.sec_ch_ua_platform_header;
+}
+
+pub fn acceptLanguageHeader(self: *const Session) [:0]const u8 {
+    return self.accept_language_header_override orelse self.browser.app.config.http_headers.accept_language_header;
+}
+
+pub fn navigatorPlatform(self: *const Session) [:0]const u8 {
+    return self.navigator_platform_override orelse self.browser.app.config.http_headers.navigator_platform;
+}
+
+pub fn navigatorVendor(self: *const Session) [:0]const u8 {
+    return self.navigator_vendor_override orelse self.browser.app.config.http_headers.navigator_vendor;
+}
+
+pub fn navigatorAppVersion(self: *const Session) [:0]const u8 {
+    return self.navigator_app_version_override orelse self.browser.app.config.http_headers.navigator_app_version;
+}
+
+pub fn cdpProduct(self: *const Session) [:0]const u8 {
+    return self.cdp_product_override orelse self.browser.app.config.http_headers.cdp_product;
+}
+
+pub fn cdpUserAgent(self: *const Session) [:0]const u8 {
+    return self.cdp_user_agent_override orelse self.browser.app.config.http_headers.cdp_user_agent;
+}
+
+pub fn gpuVendor(self: *const Session) [:0]const u8 {
+    return self.browser.app.config.http_headers.gpu_vendor;
+}
+
+pub fn gpuRenderer(self: *const Session) [:0]const u8 {
+    return self.browser.app.config.http_headers.gpu_renderer;
 }
 
 pub const WaitResult = enum {

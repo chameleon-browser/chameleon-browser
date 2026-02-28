@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<script src="../../testing.js"></script>
+
+<script id="table_insert_row_and_cell">
+  {
+    const table = document.createElement('table')
+    const row = table.insertRow()
+    const cell = row.insertCell()
+
+    cell.textContent = 'ok'
+
+    testing.expectEqual('HTMLTableRowElement', row.constructor.name)
+    testing.expectEqual('HTMLTableCellElement', cell.constructor.name)
+    testing.expectEqual(1, table.childNodes.length)
+    testing.expectEqual(1, row.childNodes.length)
+    testing.expectEqual('ok', table.childNodes[0].childNodes[0].textContent)
+  }
+</script>
+
+<script id="table_insert_with_index">
+  {
+    const table = document.createElement('table')
+    const rowA = table.insertRow()
+    rowA.insertCell().textContent = 'a'
+
+    const rowB = table.insertRow(0)
+    rowB.insertCell().textContent = 'b'
+
+    testing.expectEqual('b', table.childNodes[0].childNodes[0].textContent)
+    testing.expectEqual('a', table.childNodes[1].childNodes[0].textContent)
+  }
+</script>
+
+<script id="table_cell_colspan">
+  {
+    const table = document.createElement('table')
+    const row = table.insertRow()
+    const cell = row.insertCell()
+
+    testing.expectEqual(1, cell.colSpan)
+    cell.colSpan = 2
+    testing.expectEqual(2, cell.colSpan)
+    testing.expectEqual('2', cell.getAttribute('colspan'))
+  }
+</script>

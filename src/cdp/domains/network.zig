@@ -45,7 +45,7 @@ pub fn processMessage(cmd: anytype) !void {
         .enable => return enable(cmd),
         .disable => return disable(cmd),
         .setCacheDisabled => return cmd.sendResult(null, .{}),
-        .setUserAgentOverride => return cmd.sendResult(null, .{}),
+        .setUserAgentOverride => return setUserAgentOverride(cmd),
         .setExtraHTTPHeaders => return setExtraHTTPHeaders(cmd),
         .deleteCookies => return deleteCookies(cmd),
         .clearBrowserCookies => return clearBrowserCookies(cmd),
@@ -54,6 +54,204 @@ pub fn processMessage(cmd: anytype) !void {
         .getCookies => return getCookies(cmd),
         .getResponseBody => return getResponseBody(cmd),
     }
+}
+
+fn setUserAgentOverride(cmd: anytype) !void {
+    const UserAgentBrandVersion = struct {
+        brand: []const u8,
+        version: []const u8,
+    };
+    const UserAgentMetadata = struct {
+        brands: ?[]const UserAgentBrandVersion = null,
+        fullVersionList: ?[]const UserAgentBrandVersion = null,
+        platform: ?[]const u8 = null,
+        platformVersion: ?[]const u8 = null,
+        architecture: ?[]const u8 = null,
+        model: ?[]const u8 = null,
+        mobile: ?bool = null,
+        bitness: ?[]const u8 = null,
+        wow64: ?bool = null,
+    };
+    const params = (try cmd.params(struct {
+        userAgent: []const u8,
+        acceptLanguage: ?[]const u8 = null,
+        platform: ?[]const u8 = null,
+        userAgentMetadata: ?UserAgentMetadata = null,
+    })) orelse return error.InvalidParams;
+
+    const bc = cmd.browser_context orelse return error.BrowserContextNotLoaded;
+    const session = bc.session;
+    const arena = bc.arena;
+
+    const user_agent = try std.fmt.allocPrintSentinel(arena, "{s}", .{params.userAgent}, 0);
+    session.user_agent_override = user_agent;
+    session.user_agent_header_override = try std.fmt.allocPrintSentinel(arena, "User-Agent: {s}", .{user_agent}, 0);
+
+    const ua_kind = browserKindFromUserAgent(user_agent);
+    const ua_major = browserMajorFromUserAgent(user_agent);
+
+    if (params.userAgentMetadata) |meta| {
+        const brands = meta.brands orelse meta.fullVersionList;
+        if (brands) |b| {
+            session.sec_ch_ua_header_override = try buildSecChUaHeader(arena, b);
+        } else {
+            session.sec_ch_ua_header_override = try defaultSecChUaHeader(arena, ua_kind, ua_major);
+        }
+    } else {
+        session.sec_ch_ua_header_override = try defaultSecChUaHeader(arena, ua_kind, ua_major);
+    }
+
+    const is_mobile = if (params.userAgentMetadata) |meta|
+        meta.mobile orelse isMobileUserAgent(user_agent)
+    else
+        isMobileUserAgent(user_agent);
+    session.sec_ch_ua_mobile_header_override = if (is_mobile) "sec-ch-ua-mobile: ?1" else "sec-ch-ua-mobile: ?0";
+
+    const metadata_platform = if (params.userAgentMetadata) |meta| meta.platform else null;
+    const navigator_platform = if (params.platform) |p| p else if (metadata_platform) |p| fromClientHintPlatform(p) else inferNavigatorPlatform(user_agent);
+    session.navigator_platform_override = try std.fmt.allocPrintSentinel(arena, "{s}", .{navigator_platform}, 0);
+    session.navigator_vendor_override = switch (ua_kind) {
+        .safari => "Apple Computer, Inc.",
+        .chrome, .edge => "Google Inc.",
+    };
+    session.navigator_app_version_override = try navigatorAppVersionFromUserAgent(arena, user_agent);
+
+    const ch_platform = metadata_platform orelse toClientHintPlatform(navigator_platform);
+    session.sec_ch_ua_platform_header_override = try std.fmt.allocPrintSentinel(arena, "sec-ch-ua-platform: \"{s}\"", .{ch_platform}, 0);
+
+    if (params.acceptLanguage) |accept_language| {
+        session.accept_language_header_override = try std.fmt.allocPrintSentinel(arena, "accept-language: {s}", .{accept_language}, 0);
+    } else {
+        session.accept_language_header_override = null;
+    }
+
+    session.cdp_user_agent_override = user_agent;
+    session.cdp_product_override = try cdpProductFromUserAgent(arena, user_agent, ua_kind);
+
+    return cmd.sendResult(null, .{});
+}
+
+const BrowserKind = enum { chrome, edge, safari };
+
+fn browserKindFromUserAgent(user_agent: []const u8) BrowserKind {
+    if (std.mem.indexOf(u8, user_agent, "Edg/") != null) {
+        return .edge;
+    }
+    if (std.mem.indexOf(u8, user_agent, "Safari/") != null and std.mem.indexOf(u8, user_agent, "Chrome/") == null) {
+        return .safari;
+    }
+    return .chrome;
+}
+
+fn browserMajorFromUserAgent(user_agent: []const u8) []const u8 {
+    const token = if (std.mem.indexOf(u8, user_agent, "Edg/") != null)
+        "Edg/"
+    else if (std.mem.indexOf(u8, user_agent, "Chrome/") != null)
+        "Chrome/"
+    else if (std.mem.indexOf(u8, user_agent, "Version/") != null)
+        "Version/"
+    else
+        return "99";
+
+    const start = std.mem.indexOf(u8, user_agent, token).? + token.len;
+    const rest = user_agent[start..];
+    const end = std.mem.indexOfScalar(u8, rest, '.') orelse return rest;
+    return rest[0..end];
+}
+
+fn isMobileUserAgent(user_agent: []const u8) bool {
+    return std.mem.indexOf(u8, user_agent, "Mobile") != null or std.mem.indexOf(u8, user_agent, "Android") != null;
+}
+
+fn inferNavigatorPlatform(user_agent: []const u8) []const u8 {
+    if (std.mem.indexOf(u8, user_agent, "Windows") != null) return "Win32";
+    if (std.mem.indexOf(u8, user_agent, "Macintosh") != null) return "MacIntel";
+    if (std.mem.indexOf(u8, user_agent, "Android") != null) return "Linux armv8l";
+    if (std.mem.indexOf(u8, user_agent, "Linux") != null) return "Linux x86_64";
+    return "Unknown";
+}
+
+fn toClientHintPlatform(navigator_platform: []const u8) []const u8 {
+    if (std.mem.eql(u8, navigator_platform, "Win32")) return "Windows";
+    if (std.mem.eql(u8, navigator_platform, "MacIntel")) return "macOS";
+    if (std.mem.startsWith(u8, navigator_platform, "Linux")) return "Linux";
+    return navigator_platform;
+}
+
+fn fromClientHintPlatform(ch_platform: []const u8) []const u8 {
+    if (std.mem.eql(u8, ch_platform, "Windows")) return "Win32";
+    if (std.mem.eql(u8, ch_platform, "macOS")) return "MacIntel";
+    if (std.mem.eql(u8, ch_platform, "Android")) return "Linux armv8l";
+    if (std.mem.eql(u8, ch_platform, "Linux")) return "Linux x86_64";
+    return ch_platform;
+}
+
+fn defaultSecChUaHeader(arena: Allocator, kind: BrowserKind, ua_major: []const u8) ![:0]const u8 {
+    return switch (kind) {
+        .edge => if (std.mem.eql(u8, ua_major, "99"))
+            std.fmt.allocPrintSentinel(arena, "sec-ch-ua: \" Not A;Brand\";v=\"99\", \"Chromium\";v=\"99\", \"Microsoft Edge\";v=\"99\"", .{}, 0)
+        else if (std.mem.eql(u8, ua_major, "101"))
+            std.fmt.allocPrintSentinel(arena, "sec-ch-ua: \" Not A;Brand\";v=\"99\", \"Chromium\";v=\"101\", \"Microsoft Edge\";v=\"101\"", .{}, 0)
+        else
+            std.fmt.allocPrintSentinel(arena, "sec-ch-ua: \" Not A;Brand\";v=\"99\", \"Chromium\";v=\"{s}\", \"Microsoft Edge\";v=\"{s}\"", .{ ua_major, ua_major }, 0),
+        .safari => std.fmt.allocPrintSentinel(arena, "sec-ch-ua: \" Not A;Brand\";v=\"99\", \"Safari\";v=\"{s}\"", .{ua_major}, 0),
+        .chrome => if (std.mem.eql(u8, ua_major, "99"))
+            std.fmt.allocPrintSentinel(arena, "sec-ch-ua: \" Not A;Brand\";v=\"99\", \"Chromium\";v=\"99\", \"Google Chrome\";v=\"99\"", .{}, 0)
+        else if (std.mem.eql(u8, ua_major, "100"))
+            std.fmt.allocPrintSentinel(arena, "sec-ch-ua: \" Not A;Brand\";v=\"99\", \"Chromium\";v=\"100\", \"Google Chrome\";v=\"100\"", .{}, 0)
+        else if (std.mem.eql(u8, ua_major, "101"))
+            std.fmt.allocPrintSentinel(arena, "sec-ch-ua: \" Not A;Brand\";v=\"99\", \"Chromium\";v=\"101\", \"Google Chrome\";v=\"101\"", .{}, 0)
+        else if (std.mem.eql(u8, ua_major, "104"))
+            std.fmt.allocPrintSentinel(arena, "sec-ch-ua: \"Chromium\";v=\"104\", \" Not A;Brand\";v=\"99\", \"Google Chrome\";v=\"104\"", .{}, 0)
+        else if (std.mem.eql(u8, ua_major, "107"))
+            std.fmt.allocPrintSentinel(arena, "sec-ch-ua: \"Google Chrome\";v=\"107\", \"Chromium\";v=\"107\", \"Not=A?Brand\";v=\"24\"", .{}, 0)
+        else if (std.mem.eql(u8, ua_major, "110"))
+            std.fmt.allocPrintSentinel(arena, "sec-ch-ua: \"Chromium\";v=\"110\", \"Not A(Brand\";v=\"24\", \"Google Chrome\";v=\"110\"", .{}, 0)
+        else if (std.mem.eql(u8, ua_major, "116"))
+            std.fmt.allocPrintSentinel(arena, "sec-ch-ua: \"Chromium\";v=\"116\", \"Not)A;Brand\";v=\"24\", \"Google Chrome\";v=\"116\"", .{}, 0)
+        else
+            std.fmt.allocPrintSentinel(arena, "sec-ch-ua: \"Chromium\";v=\"{s}\", \"Google Chrome\";v=\"{s}\", \" Not A;Brand\";v=\"99\"", .{ ua_major, ua_major }, 0),
+    };
+}
+
+fn buildSecChUaHeader(arena: Allocator, brands: anytype) ![:0]const u8 {
+    var list = std.ArrayList(u8).empty;
+    try list.appendSlice(arena, "sec-ch-ua: ");
+    for (brands, 0..) |b, i| {
+        if (i > 0) {
+            try list.appendSlice(arena, ", ");
+        }
+        try list.writer(arena).print("\"{s}\";v=\"{s}\"", .{ b.brand, b.version });
+    }
+    try list.append(arena, 0);
+    return list.items[0 .. list.items.len - 1 :0];
+}
+
+fn navigatorAppVersionFromUserAgent(arena: Allocator, user_agent: []const u8) ![:0]const u8 {
+    if (std.mem.startsWith(u8, user_agent, "Mozilla/")) {
+        return std.fmt.allocPrintSentinel(arena, "{s}", .{user_agent["Mozilla/".len..]}, 0);
+    }
+    return std.fmt.allocPrintSentinel(arena, "{s}", .{user_agent}, 0);
+}
+
+fn cdpProductFromUserAgent(arena: Allocator, user_agent: []const u8, kind: BrowserKind) ![:0]const u8 {
+    const token = switch (kind) {
+        .edge, .chrome => "Chrome/",
+        .safari => "Version/",
+    };
+    if (std.mem.indexOf(u8, user_agent, token)) |start_raw| {
+        const start = start_raw + token.len;
+        const rest = user_agent[start..];
+        const end = std.mem.indexOfScalar(u8, rest, ' ') orelse rest.len;
+        return switch (kind) {
+            .safari => std.fmt.allocPrintSentinel(arena, "Safari/{s}", .{rest[0..end]}, 0),
+            .edge, .chrome => std.fmt.allocPrintSentinel(arena, "Chrome/{s}", .{rest[0..end]}, 0),
+        };
+    }
+    return switch (kind) {
+        .safari => "Safari/15",
+        .edge, .chrome => "Chrome/99",
+    };
 }
 
 fn enable(cmd: anytype) !void {
@@ -459,6 +657,73 @@ test "cdp.network setExtraHTTPHeaders" {
 
     const bc = ctx.cdp().browser_context.?;
     try testing.expectEqual(bc.extra_headers.items.len, 1);
+}
+
+test "cdp.network setUserAgentOverride" {
+    var ctx = testing.context();
+    defer ctx.deinit();
+
+    _ = try ctx.loadBrowserContext(.{ .id = "BID-UA", .session_id = "SID-UA" });
+
+    try ctx.processMessage(.{
+        .id = 11,
+        .method = "Network.setUserAgentOverride",
+        .params = .{
+            .userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.5845.180 Safari/537.36",
+            .acceptLanguage = "zh-CN,zh;q=0.9",
+            .platform = "Win32",
+        },
+    });
+    try ctx.expectSentResult(null, .{ .id = 11 });
+
+    const session = ctx.cdp().browser_context.?.session;
+    try testing.expectEqual(true, std.mem.indexOf(u8, session.userAgent(), "Chrome/116.0.5845.180") != null);
+    try testing.expectEqual("User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.5845.180 Safari/537.36", session.userAgentHeader());
+    try testing.expectEqual("sec-ch-ua-platform: \"Windows\"", session.secChUaPlatformHeader());
+    try testing.expectEqual("accept-language: zh-CN,zh;q=0.9", session.acceptLanguageHeader());
+    try testing.expectEqual("Win32", session.navigatorPlatform());
+
+    try ctx.processMessage(.{
+        .id = 12,
+        .method = "Browser.getVersion",
+    });
+    try ctx.expectSentResult(.{
+        .protocolVersion = "1.3",
+        .product = "Chrome/116.0.5845.180",
+        .revision = "@9e6ded5ac1ff5e38d930ae52bd9aec09bd1a68e4",
+        .userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.5845.180 Safari/537.36",
+        .jsVersion = "12.4.254.8",
+    }, .{ .id = 12 });
+}
+
+test "cdp.network setUserAgentOverride with userAgentMetadata" {
+    var ctx = testing.context();
+    defer ctx.deinit();
+
+    _ = try ctx.loadBrowserContext(.{ .id = "BID-UAM", .session_id = "SID-UAM" });
+
+    try ctx.processMessage(.{
+        .id = 13,
+        .method = "Network.setUserAgentOverride",
+        .params = .{
+            .userAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
+            .userAgentMetadata = .{
+                .brands = &[_]struct { brand: []const u8, version: []const u8 }{
+                    .{ .brand = "Chromium", .version = "116" },
+                    .{ .brand = "Not?A_Brand", .version = "99" },
+                },
+                .platform = "Linux",
+                .mobile = false,
+            },
+        },
+    });
+    try ctx.expectSentResult(null, .{ .id = 13 });
+
+    const session = ctx.cdp().browser_context.?.session;
+    try testing.expectEqual("sec-ch-ua: \"Chromium\";v=\"116\", \"Not?A_Brand\";v=\"99\"", session.secChUaHeader());
+    try testing.expectEqual("sec-ch-ua-mobile: ?0", session.secChUaMobileHeader());
+    try testing.expectEqual("sec-ch-ua-platform: \"Linux\"", session.secChUaPlatformHeader());
+    try testing.expectEqual("Linux x86_64", session.navigatorPlatform());
 }
 
 test "cdp.Network: cookies" {

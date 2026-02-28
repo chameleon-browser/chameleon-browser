@@ -5,9 +5,14 @@
 {
   const element = document.createElement("canvas");
   const ctx = element.getContext("2d");
+  const ctx2 = element.getContext("2d");
   testing.expectEqual(true, ctx instanceof CanvasRenderingContext2D);
+  testing.expectEqual(true, ctx === ctx2);
   // We can't really test this but let's try to call it at least.
   ctx.fillRect(0, 0, 0, 0);
+  const image = ctx.getImageData(0, 0, 1, 1);
+  testing.expectEqual('object', typeof image);
+  testing.expectEqual(4, image.data.length);
 }
 </script>
 
@@ -31,5 +36,25 @@
   testing.expectEqual(ctx.fillStyle, "#ff0000");
   ctx.fillStyle = "#fF00000F";
   testing.expectEqual(ctx.fillStyle, "rgba(255, 0, 0, 0.06)");
+}
+</script>
+
+<script id=CanvasRenderingContext2D#getImageData_coercion>
+{
+  const element = document.createElement("canvas");
+  const ctx = element.getContext("2d");
+  const image = ctx.getImageData({ valueOf() { return 0; } }, { valueOf() { return 0; } }, 1, 1);
+  testing.expectEqual('object', typeof image);
+  testing.expectEqual(4, image.data.length);
+}
+</script>
+
+<script id=CanvasRenderingContext2D#getImageData_missing_args>
+{
+  const element = document.createElement("canvas");
+  const ctx = element.getContext("2d");
+  testing.expectError("4 arguments required", () => {
+    ctx.getImageData(0);
+  });
 }
 </script>

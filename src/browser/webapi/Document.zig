@@ -369,6 +369,10 @@ pub fn createEvent(_: *const Document, event_type: []const u8, page: *Page) !*@i
         return error.NotSupported;
     }
 
+    if (std.ascii.eqlIgnoreCase(event_type, "touchevent")) {
+        return Event.init("", null, page);
+    }
+
     return error.NotSupported;
 }
 

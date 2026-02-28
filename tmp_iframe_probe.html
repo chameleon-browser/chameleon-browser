@@ -1,0 +1,21 @@
+<!doctype html>
+<html>
+<body>
+<iframe id="f" src="about:blank"></iframe>
+<pre id="out"></pre>
+<script>
+  const iframe = document.getElementById("f");
+  const cw = iframe.contentWindow;
+  document.getElementById("out").textContent = JSON.stringify({
+    sameWindow: cw === window,
+    sameSetTimeout: cw.setTimeout === window.setTimeout,
+    sameNavigator: cw.navigator === window.navigator,
+    sameChrome: cw.chrome === window.chrome,
+    topIsWindow: cw.top === window,
+    parentIsWindow: cw.parent === window,
+    frameElementIsIframe: cw.frameElement === iframe,
+    webdriverIn: "webdriver" in cw.navigator,
+  });
+</script>
+</body>
+</html>

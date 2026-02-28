@@ -139,7 +139,7 @@ fn clearList(list: *std.DoublyLinkedList) void {
 }
 
 pub fn getHeaders(self: *ScriptManager, url: [:0]const u8) !Http.Headers {
-    var headers = try self.client.newHeaders();
+    var headers = try self.client.newHeaders(self.page._session.userAgentHeader());
     try self.page.headersForRequest(self.page.arena, url, &headers);
     return headers;
 }

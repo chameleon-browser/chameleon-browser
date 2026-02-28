@@ -84,6 +84,28 @@ pub fn hasReadyTasks(self: *Scheduler) bool {
     return queueuHasReadyTask(&self.low_priority, now) or queueuHasReadyTask(&self.high_priority, now);
 }
 
+/// Returns the ms until the next scheduled (but not yet ready) task,
+/// or null if there are no pending tasks at all.
+/// This does NOT require entering a V8 context.
+pub fn msToNextTask(self: *Scheduler) ?u64 {
+    const now = milliTimestamp(.monotonic);
+    var result: ?u64 = null;
+    if (self.low_priority.peek()) |task| {
+        if (task.run_at > now) {
+            result = @intCast(task.run_at - now);
+        }
+    }
+    if (self.high_priority.peek()) |task| {
+        if (task.run_at > now) {
+            const ms: u64 = @intCast(task.run_at - now);
+            if (result == null or ms < result.?) {
+                result = ms;
+            }
+        }
+    }
+    return result;
+}
+
 fn runQueue(self: *Scheduler, queue: *Queue) !?u64 {
     if (queue.count() == 0) {
         return null;

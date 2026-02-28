@@ -60,10 +60,41 @@ pub fn init(input: Input, options: ?InitOpts, page: *Page) !js.Promise {
     };
 
     const http_client = page._session.browser.http_client;
-    var headers = try http_client.newHeaders();
+    var headers = try http_client.newHeaders(page._session.userAgentHeader());
     if (request._headers) |h| {
         try h.populateHttpHeader(page.call_arena, &headers);
     }
+
+    // Add default browser headers for fetch if not already set by user.
+    const user_headers = request._headers;
+    if (user_headers == null or !user_headers.?.has("sec-ch-ua", page)) {
+        try headers.add(page._session.secChUaHeader());
+    }
+    if (user_headers == null or !user_headers.?.has("sec-ch-ua-mobile", page)) {
+        try headers.add(page._session.secChUaMobileHeader());
+    }
+    if (user_headers == null or !user_headers.?.has("sec-ch-ua-platform", page)) {
+        try headers.add(page._session.secChUaPlatformHeader());
+    }
+    if (user_headers == null or !user_headers.?.has("accept", page)) {
+        try headers.add("accept: */*");
+    }
+    if (user_headers == null or !user_headers.?.has("sec-fetch-site", page)) {
+        try headers.add("sec-fetch-site: same-origin");
+    }
+    if (user_headers == null or !user_headers.?.has("sec-fetch-mode", page)) {
+        try headers.add("sec-fetch-mode: cors");
+    }
+    if (user_headers == null or !user_headers.?.has("sec-fetch-dest", page)) {
+        try headers.add("sec-fetch-dest: empty");
+    }
+    if (user_headers == null or !user_headers.?.has("accept-encoding", page)) {
+        try headers.add("accept-encoding: gzip, deflate, br");
+    }
+    if (user_headers == null or !user_headers.?.has("accept-language", page)) {
+        try headers.add(page._session.acceptLanguageHeader());
+    }
+
     try page.headersForRequest(page.arena, request._url, &headers);
 
     if (comptime IS_DEBUG) {
@@ -190,7 +221,14 @@ fn httpErrorCallback(ctx: *anyopaque, err: anyerror) void {
     self._page.js.localScope(&ls);
     defer ls.deinit();
 
-    ls.toLocal(self._resolver).reject("fetch error", @errorName(err));
+    if (comptime IS_DEBUG) {
+        log.debug(.http, "request error", .{ .source = "fetch", .url = self._url, .err = err });
+    }
+    const rejection = js.Value{
+        .local = &ls.local,
+        .handle = ls.local.isolate.createTypeError("Failed to fetch"),
+    };
+    ls.toLocal(self._resolver).reject("fetch error", rejection);
 }
 
 fn httpShutdownCallback(ctx: *anyopaque) void {

@@ -210,12 +210,42 @@ pub fn send(self: *XMLHttpRequest, body_: ?[]const u8) !void {
 
     const page = self._page;
     const http_client = page._session.browser.http_client;
-    var headers = try http_client.newHeaders();
+    var headers = try http_client.newHeaders(page._session.userAgentHeader());
 
     // Only add cookies for same-origin or when withCredentials is true
     const cookie_support = self._with_credentials or try page.isSameOrigin(self._url);
 
     try self._request_headers.populateHttpHeader(page.call_arena, &headers);
+
+    // Add default browser headers for XHR if not already set by user.
+    if (!self._request_headers.has("sec-ch-ua", page)) {
+        try headers.add(page._session.secChUaHeader());
+    }
+    if (!self._request_headers.has("sec-ch-ua-mobile", page)) {
+        try headers.add(page._session.secChUaMobileHeader());
+    }
+    if (!self._request_headers.has("sec-ch-ua-platform", page)) {
+        try headers.add(page._session.secChUaPlatformHeader());
+    }
+    if (!self._request_headers.has("accept", page)) {
+        try headers.add("accept: */*");
+    }
+    if (!self._request_headers.has("sec-fetch-site", page)) {
+        try headers.add("sec-fetch-site: same-origin");
+    }
+    if (!self._request_headers.has("sec-fetch-mode", page)) {
+        try headers.add("sec-fetch-mode: cors");
+    }
+    if (!self._request_headers.has("sec-fetch-dest", page)) {
+        try headers.add("sec-fetch-dest: empty");
+    }
+    if (!self._request_headers.has("accept-encoding", page)) {
+        try headers.add("accept-encoding: gzip, deflate, br");
+    }
+    if (!self._request_headers.has("accept-language", page)) {
+        try headers.add(page._session.acceptLanguageHeader());
+    }
+
     if (cookie_support) {
         try page.headersForRequest(self._arena, self._url, &headers);
     }

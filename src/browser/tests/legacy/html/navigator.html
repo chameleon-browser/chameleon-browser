@@ -2,7 +2,7 @@
 <script src="../testing.js"></script>
 
 <script id=navigator>
-  testing.expectEqual('Lightpanda/1.0',  navigator.userAgent);
-  testing.expectEqual('1.0',  navigator.appVersion);
+  testing.expectEqual(true, navigator.userAgent.includes('Mozilla/5.0'));
+  testing.expectEqual(true, navigator.appVersion.length > 0);
   testing.expectEqual('en-US',  navigator.language);
 </script>

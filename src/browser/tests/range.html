@@ -16,6 +16,22 @@
 }
 </script>
 
+<script id=geometry>
+{
+  const range = document.createRange();
+  const p1 = $('#p1');
+
+  range.selectNodeContents(p1);
+
+  const rect = range.getBoundingClientRect();
+  testing.expectEqual('object', typeof rect);
+
+  const rects = range.getClientRects();
+  testing.expectEqual(true, Array.isArray(rects));
+  testing.expectEqual(true, rects.length > 0);
+}
+</script>
+
 <script id=initial_state>
 {
   const range = document.createRange();

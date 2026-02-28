@@ -28,7 +28,9 @@ const Navigation = @import("navigation/Navigation.zig");
 const Crypto = @import("Crypto.zig");
 const CSS = @import("CSS.zig");
 const Navigator = @import("Navigator.zig");
+const Chrome = @import("Chrome.zig");
 const Screen = @import("Screen.zig");
+const SpeechSynthesis = @import("SpeechSynthesis.zig");
 const VisualViewport = @import("VisualViewport.zig");
 const Performance = @import("Performance.zig");
 const Document = @import("Document.zig");
@@ -57,6 +59,8 @@ _css: CSS = .init,
 _crypto: Crypto = .init,
 _console: Console = .init,
 _navigator: Navigator = .init,
+_chrome: Chrome = .init,
+_speech_synthesis: SpeechSynthesis = .init,
 _screen: *Screen,
 _visual_viewport: *VisualViewport,
 _performance: Performance,
@@ -66,6 +70,7 @@ _on_pageshow: ?js.Function.Global = null,
 _on_popstate: ?js.Function.Global = null,
 _on_error: ?js.Function.Global = null,
 _on_unhandled_rejection: ?js.Function.Global = null, // TODO: invoke on error
+_on_device_motion: ?js.Function.Global = null,
 _location: *Location,
 _timer_id: u30 = 0,
 _timers: std.AutoHashMapUnmanaged(u32, *ScheduleCallback) = .{},
@@ -108,6 +113,14 @@ pub fn getNavigator(self: *Window) *Navigator {
     return &self._navigator;
 }
 
+pub fn getChrome(self: *Window) *Chrome {
+    return &self._chrome;
+}
+
+pub fn getSpeechSynthesis(self: *Window) *SpeechSynthesis {
+    return &self._speech_synthesis;
+}
+
 pub fn getScreen(self: *Window) *Screen {
     return self._screen;
 }
@@ -142,6 +155,17 @@ pub fn getLocation(self: *const Window) *Location {
 
 pub fn getSelection(self: *const Window) *Selection {
     return &self._document._selection;
+}
+
+pub fn getIsSecureContext(_: *const Window, page: *Page) bool {
+    const url = page.url;
+    return std.ascii.startsWithIgnoreCase(url, "https://") or
+        std.ascii.startsWithIgnoreCase(url, "wss://") or
+        std.ascii.startsWithIgnoreCase(url, "file://");
+}
+
+pub fn openDatabase(_: *const Window) bool {
+    return false;
 }
 
 pub fn setLocation(_: *const Window, url: [:0]const u8, page: *Page) !void {
@@ -198,6 +222,14 @@ pub fn getOnUnhandledRejection(self: *const Window) ?js.Function.Global {
 
 pub fn setOnUnhandledRejection(self: *Window, setter: ?FunctionSetter) void {
     self._on_unhandled_rejection = getFunctionFromSetter(setter);
+}
+
+pub fn getOnDeviceMotion(self: *const Window) ?js.Function.Global {
+    return self._on_device_motion;
+}
+
+pub fn setOnDeviceMotion(self: *Window, setter: ?FunctionSetter) void {
+    self._on_device_motion = getFunctionFromSetter(setter);
 }
 
 pub fn fetch(_: *const Window, input: Fetch.Input, options: ?Fetch.InitOpts, page: *Page) !js.Promise {
@@ -719,6 +751,8 @@ pub const JsApi = struct {
     pub const parent = bridge.accessor(Window.getWindow, null, .{});
     pub const console = bridge.accessor(Window.getConsole, null, .{});
     pub const navigator = bridge.accessor(Window.getNavigator, null, .{});
+    pub const chrome = bridge.accessor(Window.getChrome, null, .{});
+    pub const speechSynthesis = bridge.accessor(Window.getSpeechSynthesis, null, .{});
     pub const screen = bridge.accessor(Window.getScreen, null, .{});
     pub const visualViewport = bridge.accessor(Window.getVisualViewport, null, .{});
     pub const performance = bridge.accessor(Window.getPerformance, null, .{});
@@ -755,25 +789,32 @@ pub const JsApi = struct {
     pub const reportError = bridge.function(Window.reportError, .{});
     pub const getComputedStyle = bridge.function(Window.getComputedStyle, .{});
     pub const getSelection = bridge.function(Window.getSelection, .{});
-
+    pub const openDatabase = bridge.function(Window.openDatabase, .{});
     pub const frames = bridge.accessor(Window.getWindow, null, .{});
     pub const index = bridge.indexed(Window.getFrame, .{ .null_as_undefined = true });
     pub const length = bridge.accessor(Window.getFramesLength, null, .{});
     pub const scrollX = bridge.accessor(Window.getScrollX, null, .{});
     pub const scrollY = bridge.accessor(Window.getScrollY, null, .{});
+    pub const screenX = bridge.property(0, .{ .template = false });
+    pub const screenY = bridge.property(0, .{ .template = false });
     pub const pageXOffset = bridge.accessor(Window.getScrollX, null, .{});
     pub const pageYOffset = bridge.accessor(Window.getScrollY, null, .{});
     pub const scrollTo = bridge.function(Window.scrollTo, .{});
     pub const scroll = bridge.function(Window.scrollTo, .{});
 
-    // Return false since we don't have secure-context-only APIs implemented
-    // (webcam, geolocation, clipboard, etc.)
-    // This is safer and could help avoid processing errors by hinting at
-    // sites not to try to access those features
-    pub const isSecureContext = bridge.property(false, .{ .template = false });
+    pub const isSecureContext = bridge.accessor(Window.getIsSecureContext, null, .{});
 
     pub const innerWidth = bridge.property(1920, .{ .template = false });
-    pub const innerHeight = bridge.property(1080, .{ .template = false });
+    pub const innerHeight = bridge.property(947, .{ .template = false });
+    pub const outerWidth = bridge.property(1920, .{ .template = false });
+    pub const outerHeight = bridge.property(1040, .{ .template = false });
+    pub const devicePixelRatio = bridge.property(1.0, .{ .template = false });
+    pub const indexedDB = bridge.property(true, .{ .template = false });
+    pub const doNotTrack = bridge.property(null, .{ .template = false });
+    pub const external = bridge.property(true, .{ .template = false });
+    pub const webkitAudioContext = bridge.property(null, .{ .template = false });
+    pub const ondevicemotion = bridge.accessor(Window.getOnDeviceMotion, Window.setOnDeviceMotion, .{});
+    pub const ontouchstart = bridge.property(null, .{ .template = false });
     // This should return a window-like object in specific conditions. Would be
     // pretty complicated to properly support I think.
     pub const opener = bridge.property(null, .{ .template = false });

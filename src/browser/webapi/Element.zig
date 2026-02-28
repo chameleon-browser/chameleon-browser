@@ -1014,12 +1014,14 @@ pub fn getBoundingClientRect(self: *Element, page: *Page) !*DOMRect {
     });
 }
 
-pub fn getClientRects(self: *Element, page: *Page) ![]DOMRect {
+pub fn getClientRects(self: *Element, page: *Page) ![]*DOMRect {
     if (!try self.checkVisibility(page)) {
         return &.{};
     }
-    const ptr = try self.getBoundingClientRect(page);
-    return ptr[0..1];
+    const rect = try self.getBoundingClientRect(page);
+    const out = try page.call_arena.alloc(*DOMRect, 1);
+    out[0] = rect;
+    return out;
 }
 
 // Calculates document position by counting all nodes that appear before this one

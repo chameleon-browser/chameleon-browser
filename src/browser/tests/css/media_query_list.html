@@ -11,7 +11,7 @@
   const mql = window.matchMedia('(min-width: 600px)');
   testing.expectEqual('object', typeof mql);
   testing.expectEqual('(min-width: 600px)', mql.media);
-  testing.expectEqual(false, mql.matches);
+  testing.expectEqual(true, mql.matches);
 }
 </script>
 
@@ -24,6 +24,49 @@
   const mql2 = window.matchMedia('(prefers-color-scheme: dark)');
   testing.expectEqual('(prefers-color-scheme: dark)', mql2.media);
   testing.expectEqual(false, mql2.matches);
+}
+</script>
+
+<script id=matchMedia_media_types>
+{
+  testing.expectEqual(true, window.matchMedia('screen').matches);
+  testing.expectEqual(true, window.matchMedia('all').matches);
+  testing.expectEqual(false, window.matchMedia('print').matches);
+}
+</script>
+
+<script id=matchMedia_features>
+{
+  testing.expectEqual(true, window.matchMedia('(color)').matches);
+  testing.expectEqual(true, window.matchMedia('(hover: hover)').matches);
+  testing.expectEqual(true, window.matchMedia('(pointer: fine)').matches);
+  testing.expectEqual(true, window.matchMedia('(prefers-color-scheme: light)').matches);
+  testing.expectEqual(true, window.matchMedia('(prefers-reduced-motion: no-preference)').matches);
+  testing.expectEqual(false, window.matchMedia('(prefers-color-scheme: dark)').matches);
+  testing.expectEqual(false, window.matchMedia('(pointer: coarse)').matches);
+}
+</script>
+
+<script id=matchMedia_width>
+{
+  // Assumed viewport width is 1920px
+  testing.expectEqual(true, window.matchMedia('(min-width: 1px)').matches);
+  testing.expectEqual(true, window.matchMedia('(min-width: 1920px)').matches);
+  testing.expectEqual(false, window.matchMedia('(min-width: 2000px)').matches);
+  testing.expectEqual(true, window.matchMedia('(max-width: 1920px)').matches);
+  testing.expectEqual(true, window.matchMedia('(max-width: 2560px)').matches);
+  testing.expectEqual(false, window.matchMedia('(max-width: 1024px)').matches);
+}
+</script>
+
+<script id=matchMedia_compound>
+{
+  testing.expectEqual(true, window.matchMedia('screen and (min-width: 600px)').matches);
+  testing.expectEqual(false, window.matchMedia('print and (min-width: 600px)').matches);
+  testing.expectEqual(true, window.matchMedia('not print').matches);
+  testing.expectEqual(false, window.matchMedia('not screen').matches);
+  testing.expectEqual(true, window.matchMedia('print, screen').matches);
+  testing.expectEqual(false, window.matchMedia('print, tty').matches);
 }
 </script>
 

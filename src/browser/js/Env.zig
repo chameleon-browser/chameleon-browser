@@ -293,6 +293,14 @@ pub fn runMacrotasks(self: *Env) !?u64 {
             // underterministic whether a timer will or won't run before the
             // page shutsdown. But for tests, we need to run them to their end.
             if (ctx.scheduler.hasReadyTasks() == false) {
+                // No ready tasks, but there may be future scheduled tasks
+                // (e.g. setTimeout). Report the time until the next one so
+                // the caller doesn't exit prematurely.
+                if (ctx.scheduler.msToNextTask()) |ms| {
+                    if (ms_to_next_task == null or ms < ms_to_next_task.?) {
+                        ms_to_next_task = ms;
+                    }
+                }
                 continue;
             }
         }

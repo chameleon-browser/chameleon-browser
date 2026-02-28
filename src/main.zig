@@ -86,7 +86,7 @@ fn run(allocator: Allocator, main_arena: Allocator) !void {
             var sighandler = SigHandler{ .arena = main_arena };
             try sighandler.install();
 
-            log.debug(.app, "startup", .{ .mode = "serve", .snapshot = app.snapshot.fromEmbedded() });
+            log.debug(.app, "startup", .{ .mode = "serve", .snapshot = app.snapshot.fromEmbedded(), .browser = args.browserFingerprint() });
             const address = std.net.Address.parseIp(opts.host, opts.port) catch |err| {
                 log.fatal(.app, "invalid server address", .{ .err = err, .host = opts.host, .port = opts.port });
                 return args.printUsageAndExit(false);
@@ -107,10 +107,10 @@ fn run(allocator: Allocator, main_arena: Allocator) !void {
         },
         .fetch => |opts| {
             const url = opts.url;
-            log.debug(.app, "startup", .{ .mode = "fetch", .dump = opts.dump, .url = url, .snapshot = app.snapshot.fromEmbedded() });
+            log.debug(.app, "startup", .{ .mode = "fetch", .dump = opts.dump, .url = url, .snapshot = app.snapshot.fromEmbedded(), .browser = args.browserFingerprint() });
 
             var fetch_opts = lp.FetchOpts{
-                .wait_ms = 5000,
+                .wait_ms = 8000,
                 .dump = .{
                     .strip = opts.strip,
                     .with_base = opts.withbase,

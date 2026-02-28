@@ -191,11 +191,13 @@ pub fn dispatch(self: *EventManager, target: *EventTarget, event: *Event) Dispat
         .abort_signal,
         .media_query_list,
         .message_port,
+        .iframe_window,
         .text_track_cue,
         .navigation,
         .screen,
         .screen_orientation,
         .visual_viewport,
+        .notification,
         .generic,
         => {
             const list = self.lookup.get(.{

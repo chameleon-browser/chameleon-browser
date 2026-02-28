@@ -111,6 +111,15 @@ pub const Connection = struct {
         const easy = c.curl_easy_init() orelse return error.FailedToInitializeEasy;
         errdefer _ = c.curl_easy_cleanup(easy);
 
+        // TLS impersonation: align TLS fingerprint with the configured browser profile.
+        const imp_result = c.curl_easy_impersonate(easy, config.browserFingerprint().ptr, 0);
+        if (imp_result != c.CURLE_OK) {
+            log.warn(.http, "impersonate failed", .{
+                .browser = config.browserFingerprint(),
+                .code = imp_result,
+            });
+        }
+
         // timeouts
         try errorCheck(c.curl_easy_setopt(easy, c.CURLOPT_TIMEOUT_MS, @as(c_long, @intCast(config.httpTimeout()))));
         try errorCheck(c.curl_easy_setopt(easy, c.CURLOPT_CONNECTTIMEOUT_MS, @as(c_long, @intCast(config.httpConnectTimeout()))));
@@ -154,8 +163,8 @@ pub const Connection = struct {
 
         // compression, don't remove this. CloudFront will send gzip content
         // even if we don't support it, and then it won't be decompressed.
-        // empty string means: use whatever's available
-        try errorCheck(c.curl_easy_setopt(easy, c.CURLOPT_ACCEPT_ENCODING, ""));
+        // Keep this aligned with Chromium navigation defaults.
+        try errorCheck(c.curl_easy_setopt(easy, c.CURLOPT_ACCEPT_ENCODING, "gzip, deflate, br"));
 
         // debug
         if (comptime Http.ENABLE_DEBUG) {
@@ -269,6 +278,10 @@ pub const Headers = struct {
             return error.OutOfMemory;
         }
         return .{ .headers = header_list, .cookies = null };
+    }
+
+    pub fn initEmpty() Headers {
+        return .{ .headers = null, .cookies = null };
     }
 
     pub fn deinit(self: *const Headers) void {

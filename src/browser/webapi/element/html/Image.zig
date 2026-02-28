@@ -1,4 +1,5 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 const js = @import("../../../js/js.zig");
 const Page = @import("../../../Page.zig");
 const URL = @import("../../../URL.zig");
@@ -51,6 +52,14 @@ pub fn getSrc(self: *const Image, page: *Page) ![]const u8 {
 
 pub fn setSrc(self: *Image, value: []const u8, page: *Page) !void {
     try self.asElement().setAttributeSafe(comptime .wrap("src"), .wrap(value), page);
+
+    // When src is set from JS, simulate async image loading behavior.
+    // For data: URLs, fire a "load" event (the image data is inline).
+    // For network URLs, fire an "error" event (LP doesn't actually fetch images).
+    if (value.len > 0) {
+        const is_data_url = std.mem.startsWith(u8, value, "data:");
+        try scheduleLoadEvent(self.asElement(), page, is_data_url);
+    }
 }
 
 pub fn getAlt(self: *const Image) []const u8 {
@@ -112,6 +121,89 @@ pub fn getNaturalHeight(_: *const Image) u32 {
     return 0;
 }
 
+/// Schedule an async load/error event on the image element.
+/// For data: URLs, fires "load" (image data is inline and always succeeds).
+/// For network URLs, fires "error" (LP doesn't actually fetch images).
+fn scheduleLoadEvent(element: *Element, page: *Page, is_load: bool) !void {
+    const arena = try page.getArena(.{ .debug = "Image.loadEvent" });
+    errdefer page.releaseArena(arena);
+
+    const callback = try arena.create(ImageLoadCallback);
+    callback.* = .{
+        .element = element,
+        .page = page,
+        .arena = arena,
+        .is_load = is_load,
+    };
+    try page.js.scheduler.add(callback, ImageLoadCallback.run, 0, .{
+        .name = "image.load",
+        .low_priority = false,
+        .finalizer = ImageLoadCallback.cancelled,
+    });
+}
+
+const ImageLoadCallback = struct {
+    element: *Element,
+    page: *Page,
+    arena: Allocator,
+    is_load: bool,
+
+    fn cancelled(ctx: *anyopaque) void {
+        const self: *ImageLoadCallback = @ptrCast(@alignCast(ctx));
+        self.page.releaseArena(self.arena);
+    }
+
+    fn run(ctx: *anyopaque) !?u32 {
+        const self: *ImageLoadCallback = @ptrCast(@alignCast(ctx));
+        const page = self.page;
+        const element = self.element;
+        const is_load = self.is_load;
+        defer page.releaseArena(self.arena);
+
+        var ls: js.Local.Scope = undefined;
+        page.js.localScope(&ls);
+        defer ls.deinit();
+
+        if (is_load) {
+            // Dispatch "load" event (for data: URLs)
+            const event = try Event.initTrusted(comptime .wrap("load"), .{}, page);
+            defer if (!event._v8_handoff) event.deinit(false);
+
+            // Dispatch inline onload handler if set.
+            blk: {
+                const html_element = element.is(HtmlElement) orelse break :blk;
+                const listener = (try html_element.getOnLoad(page)) orelse break :blk;
+                ls.toLocal(listener).call(void, .{}) catch |err| {
+                    log.warn(.event, "inline image load event", .{ .element = element, .err = err });
+                };
+            }
+
+            page._event_manager.dispatch(element.asEventTarget(), event) catch |err| {
+                log.warn(.event, "image load event dispatch", .{ .element = element, .err = err });
+            };
+        } else {
+            // Dispatch "error" event (for network URLs - simulates failure)
+            const event = try Event.initTrusted(comptime .wrap("error"), .{}, page);
+            defer if (!event._v8_handoff) event.deinit(false);
+
+            // Dispatch inline onerror handler if set.
+            blk: {
+                const html_element = element.is(HtmlElement) orelse break :blk;
+                const listener = (try html_element.getOnError(page)) orelse break :blk;
+                ls.toLocal(listener).call(void, .{}) catch |err| {
+                    log.warn(.event, "inline image error event", .{ .element = element, .err = err });
+                };
+            }
+
+            page._event_manager.dispatch(element.asEventTarget(), event) catch |err| {
+                log.warn(.event, "image error event dispatch", .{ .element = element, .err = err });
+            };
+        }
+
+        return null;
+    }
+};
+
 pub const JsApi = struct {
     pub const bridge = js.Bridge(Image);
 
@@ -138,10 +230,11 @@ pub const Build = struct {
         const self = node.as(Image);
         const image = self.asElement();
         // Exit if src not set.
-        // TODO: We might want to check if src point to valid image.
         _ = image.getAttributeSafe(comptime .wrap("src")) orelse return;
 
         // Push to `_to_load` to dispatch load event just before window load event.
+        // For images parsed from HTML, we keep the existing behavior of dispatching
+        // "load" at document complete time (via _to_load).
         return page._to_load.append(page.arena, image);
     }
 };

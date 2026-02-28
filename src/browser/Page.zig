@@ -170,6 +170,7 @@ _factory: Factory,
 _load_state: LoadState,
 
 _parse_state: ParseState,
+_last_wait_error: ?anyerror = null,
 
 _notified_network_idle: IdleNotification = .init,
 _notified_network_almost_idle: IdleNotification = .init,
@@ -321,6 +322,7 @@ fn reset(self: *Page, comptime initializing: bool) !void {
     self.window._location = &default_location;
 
     self._parse_state = .pre;
+    self._last_wait_error = null;
     self._load_state = .waiting;
     self._queued_navigation = null;
     self._parse_mode = .document;
@@ -467,6 +469,7 @@ pub fn navigate(self: *Page, request_url: [:0]const u8, opts: NavigateOpts) !voi
         // same page (via CDP). We want to reset the page between each call.
         try self.reset(false);
     }
+    self._last_wait_error = null;
     self._load_state = .parsing;
 
     const req_id = self._session.browser.http_client.nextReqId();
@@ -531,7 +534,21 @@ pub fn navigate(self: *Page, request_url: [:0]const u8, opts: NavigateOpts) !voi
         .method = opts.method,
     };
 
-    var headers = try http_client.newHeaders();
+    // Build navigation request headers matching real Chrome order and casing.
+    // Chrome uses title-case for standard HTTP headers in HTTP/1.1.
+    var headers = Http.Headers.initEmpty();
+    try headers.add(self._session.secChUaHeader());
+    try headers.add(self._session.secChUaMobileHeader());
+    try headers.add(self._session.secChUaPlatformHeader());
+    try headers.add("Upgrade-Insecure-Requests: 1");
+    try headers.add(self._session.userAgentHeader());
+    try headers.add("Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7");
+    try headers.add("Sec-Fetch-Site: none");
+    try headers.add("Sec-Fetch-Mode: navigate");
+    try headers.add("Sec-Fetch-User: ?1");
+    try headers.add("Sec-Fetch-Dest: document");
+    try headers.add("Accept-Encoding: gzip, deflate, br");
+    try headers.add(self._session.acceptLanguageHeader());
     if (opts.header) |hdr| {
         try headers.add(hdr);
     }
@@ -886,6 +903,7 @@ fn pageErrorCallback(ctx: *anyopaque, err: anyerror) void {
 
     var self: *Page = @ptrCast(@alignCast(ctx));
     self.clearTransferArena();
+    self._last_wait_error = err;
     self._parse_state = .{ .err = err };
 }
 
@@ -908,6 +926,7 @@ fn clearTransferArena(self: *Page) void {
 
 pub fn wait(self: *Page, wait_ms: u32) Session.WaitResult {
     return self._wait(wait_ms) catch |err| {
+        self._last_wait_error = err;
         switch (err) {
             error.JsError => {}, // already logged (with hopefully more context)
             else => {
@@ -921,6 +940,10 @@ pub fn wait(self: *Page, wait_ms: u32) Session.WaitResult {
         }
         return .done;
     };
+}
+
+pub fn lastWaitError(self: *const Page) ?anyerror {
+    return self._last_wait_error;
 }
 
 fn _wait(self: *Page, wait_ms: u32) !Session.WaitResult {

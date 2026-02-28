@@ -182,8 +182,8 @@ pub fn deinit(self: *Client) void {
     self.allocator.destroy(self);
 }
 
-pub fn newHeaders(self: *const Client) !Http.Headers {
-    return Http.Headers.init(self.config.http_headers.user_agent_header);
+pub fn newHeaders(self: *const Client, user_agent_header: ?[:0]const u8) !Http.Headers {
+    return Http.Headers.init(user_agent_header orelse self.config.http_headers.user_agent_header);
 }
 
 pub fn abort(self: *Client) void {
@@ -323,7 +323,7 @@ fn fetchRobotsThenProcessRequest(self: *Client, robots_url: [:0]const u8, req: R
         const ctx = try self.allocator.create(RobotsRequestContext);
         errdefer self.allocator.destroy(ctx);
         ctx.* = .{ .client = self, .req = req, .robots_url = robots_url, .buffer = .empty };
-        const headers = try self.newHeaders();
+        const headers = try self.newHeaders(null);
 
         log.debug(.browser, "fetching robots.txt", .{ .robots_url = robots_url });
         try self.processRequest(.{
@@ -1210,7 +1210,7 @@ pub const Transfer = struct {
         self.req.headers.deinit();
 
         var buf: std.ArrayList(u8) = .empty;
-        var new_headers = try self.client.newHeaders();
+        var new_headers = try self.client.newHeaders(null);
         for (headers) |hdr| {
             // safe to re-use this buffer, because Headers.add because curl copies
             // the value we pass into curl_slist_append.

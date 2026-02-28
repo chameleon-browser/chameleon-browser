@@ -22,12 +22,15 @@ const Page = @import("../../../Page.zig");
 const Node = @import("../../Node.zig");
 const Element = @import("../../Element.zig");
 const HtmlElement = @import("../Html.zig");
+const png = @import("../../canvas/png.zig");
 
 const CanvasRenderingContext2D = @import("../../canvas/CanvasRenderingContext2D.zig");
 const WebGLRenderingContext = @import("../../canvas/WebGLRenderingContext.zig");
 
 const Canvas = @This();
 _proto: *HtmlElement,
+_context_2d: ?*CanvasRenderingContext2D = null,
+_context_webgl: ?*WebGLRenderingContext = null,
 
 pub fn asElement(self: *Canvas) *Element {
     return self._proto._proto;
@@ -66,18 +69,68 @@ const DrawingContext = union(enum) {
     webgl: *WebGLRenderingContext,
 };
 
-pub fn getContext(_: *Canvas, context_type: []const u8, page: *Page) !?DrawingContext {
+pub fn getContext(self: *Canvas, context_type: []const u8, page: *Page) !?DrawingContext {
     if (std.mem.eql(u8, context_type, "2d")) {
+        if (self._context_2d) |ctx| {
+            return .{ .@"2d" = ctx };
+        }
         const ctx = try page._factory.create(CanvasRenderingContext2D{});
+        self._context_2d = ctx;
         return .{ .@"2d" = ctx };
     }
 
     if (std.mem.eql(u8, context_type, "webgl") or std.mem.eql(u8, context_type, "experimental-webgl")) {
+        if (self._context_webgl) |ctx| {
+            return .{ .webgl = ctx };
+        }
         const ctx = try page._factory.create(WebGLRenderingContext{});
+        self._context_webgl = ctx;
         return .{ .webgl = ctx };
     }
 
     return null;
+}
+
+pub fn toDataURL(self: *const Canvas, page: *Page) ![]const u8 {
+    const width = self.getWidth();
+    const height = self.getHeight();
+
+    // Generate raw RGBA pixel data
+    const pixel_count = @as(usize, width) * @as(usize, height);
+    const rgba_data = try page.call_arena.alloc(u8, pixel_count * 4);
+    @memset(rgba_data, 0);
+
+    if (self._context_2d) |context| {
+        for (0..height) |y| {
+            for (0..width) |x| {
+                const key = CanvasRenderingContext2D.packPixelKey(@intCast(x), @intCast(y));
+                if (context._pixels.get(key)) |pixel| {
+                    const i = (y * width + x) * 4;
+                    rgba_data[i] = pixel.r;
+                    rgba_data[i + 1] = pixel.g;
+                    rgba_data[i + 2] = pixel.b;
+                    rgba_data[i + 3] = pixel.a;
+                }
+            }
+        }
+    } else if (self._context_webgl != null) {
+        // WebGL context: generate a deterministic non-blank image
+        // (simulates rendered WebGL content for fingerprinting purposes)
+        for (0..height) |y| {
+            for (0..width) |x| {
+                const i = (y * width + x) * 4;
+                // Deterministic gradient pattern unique to canvas size
+                const seed: u32 = @as(u32, @intCast(x)) *% 2654435761 +% @as(u32, @intCast(y)) *% 340573321;
+                rgba_data[i] = @intCast((seed >> 0) & 0xFF); // R
+                rgba_data[i + 1] = @intCast((seed >> 8) & 0xFF); // G
+                rgba_data[i + 2] = @intCast((seed >> 16) & 0xFF); // B
+                rgba_data[i + 3] = 255; // A: fully opaque
+            }
+        }
+    }
+
+    // Encode as PNG and return data URL
+    return png.encodeDataURL(page.call_arena, rgba_data, width, height);
 }
 
 pub const JsApi = struct {
@@ -92,4 +145,5 @@ pub const JsApi = struct {
     pub const width = bridge.accessor(Canvas.getWidth, Canvas.setWidth, .{});
     pub const height = bridge.accessor(Canvas.getHeight, Canvas.setHeight, .{});
     pub const getContext = bridge.function(Canvas.getContext, .{});
+    pub const toDataURL = bridge.function(Canvas.toDataURL, .{});
 };
