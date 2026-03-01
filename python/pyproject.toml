@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "chameleon-browser"
 version = "0.1.0"
-description = "Python binding for Lightpanda headless browser with enhanced fingerprint spoofing"
+description = "Python binding for Chameleon headless browser with enhanced fingerprint spoofing"
 readme = "README.md"
 license = {text = "AGPL-3.0"}
 requires-python = ">=3.8"
@@ -19,7 +19,6 @@ keywords = [
     "web-scraping",
     "browser-automation",
     "cdp",
-    "puppeteer",
     "playwright",
 ]
 classifiers = [
@@ -39,7 +38,7 @@ classifiers = [
     "Topic :: Software Development :: Testing",
 ]
 dependencies = [
-    "websockets>=11.0",
+    "playwright>=1.40.0",
 ]
 
 [project.optional-dependencies]

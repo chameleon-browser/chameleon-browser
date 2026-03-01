@@ -1,99 +1,101 @@
-# Chameleon Browser
+<h1 align="center">Chameleon Browser</h1>
 
-> **This project is forked from [lightpanda-io/browser](https://github.com/lightpanda-io/browser).**
-> The original Lightpanda is an excellent open-source headless browser written in Zig. This fork aims to **significantly enhance browser fingerprint spoofing capabilities**, making it harder for anti-bot systems to detect headless usage.
+<p align="center">
+  <strong>The open-source headless browser designed for advanced fingerprint spoofing and anti-detection.</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/chameleon-browser/chameleon-browser/blob/main/LICENSE"><img src="https://img.shields.io/github/license/chameleon-browser/chameleon-browser" alt="License"></a>
+</p>
+
+> **Fork Note:** This project is a specialized fork of [lightpanda-io/browser](https://github.com/lightpanda-io/browser). While the original Lightpanda provides an incredibly fast and lightweight Zig-based headless browser, Chameleon Browser specifically focuses on **bypassing modern anti-bot systems** (Cloudflare, Akamai, PerimeterX, etc.) by simulating deeply realistic browser fingerprints.
 
 ---
 
-## Why This Fork?
+## Why Chameleon Browser?
 
-The original Lightpanda browser is fast, lightweight, and supports CDP (Chrome DevTools Protocol). However, modern anti-bot systems (Cloudflare, Akamai, PerimeterX, DataDome, etc.) go far beyond simple User-Agent checks. They inspect:
+Standard headless browsers (like Chrome Headless or Puppeteer defaults) leak their automated nature through hundreds of subtle signals. Modern WAFs and anti-bot systems inspect far more than just your `User-Agent`. 
 
-- **TLS fingerprints** (JA3/JA4, cipher suite ordering)
-- **HTTP/2 settings** (SETTINGS frame, WINDOW_UPDATE, pseudo-header order)
-- **Canvas / WebGL fingerprints** (pixel-level rendering output)
-- **AudioContext fingerprints** (oscillator + compressor DSP pipeline)
-- **Navigator API consistency** (plugins, mimeTypes, permissions, languages)
-- **CSS feature detection** (matchMedia queries)
-- **Network header ordering** (Sec-CH-UA, Sec-Fetch-* headers)
+Chameleon Browser modifies the browser engine at the lowest levels to spoof:
 
-This fork integrates [curl-impersonate](https://github.com/lwthiker/curl-impersonate) and adds profile-driven fingerprint spoofing across all these layers, with a clear roadmap to reach production-grade anti-detection.
+- **TLS Fingerprints (JA3/JA4):** Replaces BoringSSL/OpenSSL defaults with [curl-impersonate](https://github.com/lwthiker/curl-impersonate) to match exact Chrome TLS signatures.
+- **HTTP/2 Settings:** Matches Chrome's exact `SETTINGS` frames, `WINDOW_UPDATE` behavior, and pseudo-header ordering.
+- **JavaScript Global Objects:** Simulates `window.chrome` (including `runtime`, `app`, `csi`, `loadTimes`).
+- **Canvas & AudioContext:** Spoofs media device rendering and DSP pipelines to bypass fingerprint hashing.
+- **Navigator APIs:** Injects realistic `plugins`, `mimeTypes`, `permissions`, and `languages` arrays.
+- **Client Hints:** Fully implements `navigator.userAgentData` with high-entropy values.
 
-## Key Enhancements Over Upstream
+## Quick Start (Python)
 
-| Feature | Upstream | This Fork |
-|---------|----------|-----------|
-| TLS Fingerprint (JA3/JA4) | Default curl/BoringSSL | curl-impersonate with Chrome TLS profiles |
-| HTTP/2 Settings | Partial | Full Chrome-matching SETTINGS/WINDOW_UPDATE/pseudo-headers |
-| Browser Profiles | None | Configurable profiles (chrome116, chrome131-macos, etc.) |
-| `window.chrome` object | Not present | Full runtime/app/csi/loadTimes implementation |
-| `navigator.webdriver` | `true` | `false` (passes WebDriver detection) |
-| Client Hints API | Not present | Full userAgentData with brands/platform/highEntropyValues |
-| Canvas Fingerprint | Not implemented | Seed-based generation (WIP: realistic rendering) |
-| AudioContext Fingerprint | Not implemented | Seed-based generation (WIP: DSP simulation) |
-| Screen/Display properties | Defaults | Profile-driven (resolution, colorDepth, DPR) |
-| V8 Heap Limits | Unlimited | Configurable memory limits + navigation loop protection |
-| Python Binding | None | `pip install chameleon-browser` for easy integration |
+The easiest way to use Chameleon Browser is via our official Python binding, which seamlessly integrates with **Playwright**. It automatically manages the CDP server lifecycle and returns a native Playwright `Browser` instance.
 
-## Detection Test Results
-
-Tested against real-world anti-bot detection services:
-
-| Detection Service | Result |
-|-------------------|--------|
-| [bot.sannysoft.com](https://bot.sannysoft.com) | 50% pass (basic checks all pass) |
-| [AreYouHeadless](https://arh.antoinevastel.com/bots/areyouheadless) | **PASS** |
-| [tls.peet.ws](https://tls.peet.ws/api/all) | HTTP/2 match, TLS profile match |
-| [BrowserLeaks Canvas](https://browserleaks.com/canvas) | Canvas API present (fingerprint WIP) |
-
-See the full [Fingerprint Audit Report](docs/fingerprint-audit-report.md) for details.
-
-## Quick Start
-
-### Option 1: Python Binding (Recommended)
-
-The easiest way to use this project is through the Python binding:
+### Installation
 
 ```bash
-pip install chameleon-browser
+pip install chameleon-browser playwright
+playwright install chromium
 ```
+
+### Usage
 
 ```python
 from chameleon import ChameleonBrowser
 
-# Basic usage - fetch a page
-browser = ChameleonBrowser()
-html = browser.fetch("https://example.com")
-print(html)
-
-# With fingerprint profile
+# Initialize Chameleon with a specific fingerprint profile
 browser = ChameleonBrowser(profile="chrome131-macos")
-html = browser.fetch("https://bot.sannysoft.com")
 
-# Start a CDP server for Puppeteer/Playwright
-server = browser.serve(host="127.0.0.1", port=9222)
-# Then connect with Puppeteer:
-#   puppeteer.connect({ browserWSEndpoint: "ws://127.0.0.1:9222" })
-server.stop()
+# It automatically starts a CDP server on a random port and connects Playwright
+with browser.connect() as pw_browser:
+    # pw_browser is a standard Playwright Browser instance!
+    context = pw_browser.contexts[0]
+    page = context.pages[0]
+    
+    page.goto("https://bot.sannysoft.com")
+    page.screenshot(path="sannysoft_report.png")
+    print(f"Title: {page.title()}")
 ```
 
-See [python/README.md](python/README.md) for full Python API documentation.
+<details>
+<summary><strong>Async Example</strong></summary>
 
-### Option 2: Binary
+```python
+import asyncio
+from chameleon import AsyncChameleonBrowser
 
-Download pre-built binaries or build from source.
+async def main():
+    browser = AsyncChameleonBrowser(profile="chrome131-macos")
+    async with browser.connect() as pw_browser:
+        context = pw_browser.contexts[0]
+        page = context.pages[0]
+        await page.goto("https://bot.sannysoft.com")
+        print(await page.title())
 
-**Fetch a URL:**
-```console
-./chameleon fetch --browser chrome131-macos --dump https://example.com
+asyncio.run(main())
 ```
 
-**Start CDP server:**
+</details>
+
+## Available Profiles
+
+Browser profiles ensure consistency across all fingerprint vectors (TLS, HTTP/2, User-Agent, Screen dimensions, WebGL vendor, etc.).
+
+| Profile ID | Target Browser | Platform | Notes |
+|------------|----------------|----------|-------|
+| `chrome116` | Chrome 116 | Default | Widest compatibility |
+| `chrome131-macos` | Chrome 131 | macOS | Realistic Mac simulation |
+| `chrome131-windows` | Chrome 131 | Windows | Realistic Windows simulation |
+| `chrome131-linux` | Chrome 131 | Linux | Realistic Linux simulation |
+
+## Standalone Binary Usage
+
+If you prefer not to use Python, you can download the standalone binary and connect to it with any CDP client (Node.js Puppeteer, Go chromedp, etc.).
+
+**1. Start the Server:**
 ```console
 ./chameleon serve --browser chrome131-macos --host 127.0.0.1 --port 9222
 ```
 
-Then connect with Puppeteer:
+**2. Connect with Puppeteer (Node.js):**
 ```js
 import puppeteer from 'puppeteer-core';
 
@@ -103,173 +105,40 @@ const browser = await puppeteer.connect({
 
 const context = await browser.createBrowserContext();
 const page = await context.newPage();
-await page.goto('https://example.com', { waitUntil: "networkidle0" });
-
-const html = await page.content();
-console.log(html);
-
-await page.close();
-await context.close();
-await browser.disconnect();
+await page.goto('https://bot.sannysoft.com');
 ```
-
-### Option 3: Docker
-
-```console
-docker run -d --name chameleon -p 9222:9222 chameleon-browser/chameleon-browser:nightly
-```
-
-## Available Browser Profiles
-
-| Profile | UA Version | TLS Target | Use Case |
-|---------|-----------|------------|----------|
-| `chrome116` | Chrome/116 | chrome116 | Default, widest compatibility |
-| `chrome131-macos` | Chrome/131 | chrome116* | macOS simulation |
-| `chrome131-windows` | Chrome/131 | chrome116* | Windows simulation |
-| `chrome131-linux` | Chrome/131 | chrome116* | Linux simulation |
-
-*\* TLS target upgrade to chrome131 is on the roadmap (see [C-08 in audit report](docs/fingerprint-audit-report.md)).*
 
 ## Build from Source
 
 ### Prerequisites
 
 - [Zig](https://ziglang.org/) 0.15.2
-- [Rust](https://rust-lang.org/tools/install/) (for html5ever)
-- System dependencies:
+- [Rust](https://rust-lang.org/tools/install/) (for HTML parsing)
+- System dependencies: `cmake`, `pkg-config`, `libglib2.0-dev` (Linux only)
 
-**Debian/Ubuntu:**
-```bash
-sudo apt install xz-utils ca-certificates pkg-config libglib2.0-dev clang make curl git
-```
-
-**macOS:**
-```bash
-brew install cmake
-```
-
-**Nix:**
-```bash
-nix develop
-```
-
-### Build
+### Build Instructions
 
 ```bash
-# Initialize submodules (includes curl-impersonate)
+# 1. Initialize submodules (curl-impersonate, v8, etc.)
 make install-submodule
 
-# Release build
+# 2. Build the browser (Release mode)
 make build
 
-# Debug build
-make build-dev
-
-# Run tests
-make test
+# The executable will be available at ./zig-out/bin/chameleon
 ```
 
-### V8 Snapshot (optional, improves startup)
+## Detection Status & Benchmark
 
-```bash
-zig build snapshot_creator -- src/snapshot.bin
-zig build -Dsnapshot_path=../../snapshot.bin
-```
+Chameleon is continuously tested against major fingerprinting services. See our [Fingerprint Audit Report](docs/fingerprint-audit-report.md) for detailed metrics.
 
-## Project Status
-
-This fork is in active development. The fingerprint spoofing layer is functional for basic anti-bot bypass but improvements are ongoing.
-
-### Implemented
-
-- [x] HTTP loader with curl-impersonate (TLS fingerprint spoofing)
-- [x] HTML parser (html5ever from Servo)
-- [x] DOM tree + JavaScript support (V8)
-- [x] DOM APIs + Ajax (XHR/Fetch)
-- [x] CDP/WebSocket server (Puppeteer/Playwright compatible)
-- [x] Browser profile system (UA, screen, navigator properties)
-- [x] `window.chrome` object (runtime/app/csi/loadTimes)
-- [x] `navigator.webdriver = false`
-- [x] Client Hints API (userAgentData)
-- [x] Configurable screen/display properties
-- [x] Canvas/AudioContext/WebGL stub APIs with seed-based fingerprints
-- [x] RTCPeerConnection (blocks WebRTC IP leak)
-- [x] BatteryManager, Permissions API
-- [x] Cookies, custom HTTP headers, proxy support
-- [x] Network interception
-- [x] `robots.txt` support (`--obey_robots`)
-- [x] V8 heap memory limits + navigation loop protection
-- [x] Python binding (`pip install chameleon-browser`)
-
-### Roadmap
-
-- [ ] Canvas 2D: realistic pixel rendering (not just seed-based)
-- [ ] AudioContext: DSP pipeline simulation
-- [ ] WebGL: actual draw call → readPixels pipeline
-- [ ] matchMedia(): CSS media query evaluation
-- [ ] PluginArray.item() returning real Plugin objects
-- [ ] Notification API stub
-- [ ] fetch()/XHR standard headers (Sec-Fetch-*, Sec-CH-UA)
-- [ ] HTTP header ordering matching Chrome
-- [ ] Upgrade TLS target to chrome131/132
-- [ ] navigator.bluetooth/usb stubs
-- [ ] WebSocket Web API
-- [ ] CreepJS / FingerprintJS test suite pass
-
-## Fingerprint Benchmark Tool
-
-Included benchmark tool to compare fingerprint quality:
-
+To run the local benchmark against curl:
 ```bash
 python3 chameleon_benchmark.py --browser chrome116 --tls-runs 5
 ```
 
-This compares curl vs. Chameleon across multiple sites and validates TLS fingerprint stability. See [chameleon_benchmark.py](chameleon_benchmark.py) for details.
-
-## Architecture
-
-```
-chameleon-browser/
-├── src/                    # Zig source code
-│   ├── browser/            # Browser engine core
-│   │   ├── Browser.zig     # Browser implementation
-│   │   ├── Page.zig        # Page + HTTP header management
-│   │   ├── js/             # JavaScript runtime bindings
-│   │   └── webapi/         # Web API implementations (Canvas, Audio, WebGL, etc.)
-│   ├── cdp/                # Chrome DevTools Protocol
-│   ├── http/               # HTTP client (curl-impersonate integration)
-│   └── main.zig            # Entry point
-├── python/                 # Python binding package
-│   ├── chameleon/         # Python source
-│   └── pyproject.toml      # pip install configuration
-├── vendor/                 # Vendored dependencies
-│   ├── curl/               # curl (forked with fingerprint patches)
-│   ├── curl-impersonate/   # TLS fingerprint impersonation
-│   ├── nghttp2/            # HTTP/2
-│   ├── brotli/             # Brotli compression
-│   └── zlib/               # zlib compression
-├── docs/                   # Documentation
-│   └── fingerprint-audit-report.md
-└── tests/                  # Test suites (WPT, unit tests)
-```
-
-## Contributing
-
-Contributions are welcome. This project is independently maintained.
-
-For issues specific to the fingerprint enhancement features, please open an issue on [this repository](https://github.com/chameleon-browser/chameleon-browser/issues).
-
-For issues with the core browser engine, consider also checking the [upstream project](https://github.com/lightpanda-io/browser/issues).
-
 ## License
 
-This project inherits the [AGPL-3.0](LICENSE) license from the upstream project.
+This project is licensed under the **AGPL-3.0** License. See the [LICENSE](LICENSE) file for details.
 
-Original project: [lightpanda-io/browser](https://github.com/lightpanda-io/browser) by [Lightpanda (Selecy SAS)](https://lightpanda.io).
-
-## Acknowledgments
-
-- [Lightpanda](https://lightpanda.io) — the original headless browser project
-- [curl-impersonate](https://github.com/lwthiker/curl-impersonate) — TLS fingerprint impersonation
-- [V8](https://v8.dev/) — JavaScript engine
-- [html5ever](https://github.com/servo/html5ever) — HTML parser from Servo
+*Original base project by [Lightpanda (Selecy SAS)](https://lightpanda.io).*

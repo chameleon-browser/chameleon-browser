@@ -1,119 +1,73 @@
-# Chameleon Python Binding
+# Chameleon Browser Python Binding
 
-Python wrapper for the [Chameleon headless browser](https://github.com/chameleon-browser/chameleon-browser) with enhanced fingerprint spoofing capabilities.
+Python wrapper for the [Chameleon headless browser](https://github.com/chameleon-browser/chameleon-browser), designed for advanced fingerprint spoofing.
+
+## Features
+
+- **Playwright Native:** Automatically starts a CDP server and yields a standard Playwright `Browser` instance.
+- **Anti-Detection Profiles:** Pass a single profile string (`chrome131-macos`) and get TLS, HTTP/2, Canvas, and User-Agent signatures aligned automatically.
+- **Sync & Async Support:** Native support for both blocking and asyncio Playwright code.
 
 ## Installation
 
 ```bash
-pip install chameleon-browser
+pip install chameleon-browser playwright
+playwright install chromium
 ```
 
-## Quick Start
-
-### Fetch a Page
+## Quick Start (Sync)
 
 ```python
 from chameleon import ChameleonBrowser
 
-browser = ChameleonBrowser()
-html = browser.fetch("https://example.com")
-print(html)
-```
-
-### With Fingerprint Profile
-
-```python
-browser = ChameleonBrowser(profile="chrome131-macos")
-html = browser.fetch("https://bot.sannysoft.com")
-```
-
-### Start CDP Server (for Puppeteer/Playwright)
-
-```python
-from chameleon import ChameleonBrowser
-
+# Initialize Chameleon with a fingerprint profile
 browser = ChameleonBrowser(profile="chrome131-macos")
 
-# Start CDP server (blocks until stop() or context manager exit)
-with browser.cdp_server(host="127.0.0.1", port=9222) as server:
-    print(f"CDP server running at ws://{server.host}:{server.port}")
-    # Connect with Puppeteer/Playwright from another process
-    server.wait()  # or do other work
+# It automatically manages the background CDP server and connects Playwright
+with browser.connect() as pw_browser:
+    # pw_browser is a standard Playwright Browser instance
+    context = pw_browser.contexts[0]
+    page = context.pages[0]
+    
+    page.goto("https://bot.sannysoft.com")
+    page.screenshot(path="sannysoft.png")
+    print(f"Loaded: {page.title()}")
 ```
 
-### Async Support
+## Quick Start (Async)
 
 ```python
 import asyncio
-from chameleon import ChameleonBrowser
+from chameleon import AsyncChameleonBrowser
 
 async def main():
-    browser = ChameleonBrowser(profile="chrome131-macos")
-    html = await browser.async_fetch("https://example.com")
-    print(html)
+    browser = AsyncChameleonBrowser(profile="chrome131-windows")
+    
+    async with browser.connect() as pw_browser:
+        context = pw_browser.contexts[0]
+        page = context.pages[0]
+        
+        await page.goto("https://arh.antoinevastel.com/bots/areyouheadless")
+        element = await page.wait_for_selector("body")
+        print(await element.inner_text())
 
 asyncio.run(main())
 ```
 
 ## API Reference
 
-### `ChameleonBrowser`
+### `ChameleonBrowser(binary_path=None, profile=None)`
 
-Main class for interacting with the Chameleon browser.
+- `binary_path`: Explicit path to the Chameleon executable. If `None`, it automatically searches your `PATH`, the `CHAMELEON_BIN` environment variable, or a local `zig-out` development directory.
+- `profile`: A fingerprint string that configures TLS, headers, and Navigator APIs (e.g., `chrome116`, `chrome131-macos`).
 
-#### Constructor
+### `with browser.connect()` / `async with browser.connect()`
 
-```python
-ChameleonBrowser(
-    binary_path=None,     # Path to chameleon binary (auto-detected if None)
-    profile=None,         # Browser fingerprint profile (e.g., "chrome131-macos")
-    log_level="error",    # Log level: "error", "warn", "info", "debug"
-    log_format="pretty",  # Log format: "pretty", "json"
-    obey_robots=False,    # Respect robots.txt
-    http_timeout=30000,   # HTTP timeout in milliseconds
-    proxy=None,           # HTTP proxy URL
-)
-```
-
-#### Methods
-
-| Method | Description |
-|--------|-------------|
-| `fetch(url)` | Fetch a URL and return the rendered HTML |
-| `async_fetch(url)` | Async version of fetch |
-| `cdp_server(host, port)` | Start a CDP WebSocket server |
-| `version()` | Get the Chameleon binary version |
-
-### `CDPServer`
-
-Returned by `browser.cdp_server()`. Use as a context manager.
-
-| Method | Description |
-|--------|-------------|
-| `start()` | Start the server |
-| `stop()` | Stop the server |
-| `wait()` | Block until the server exits |
-| `ws_endpoint` | WebSocket endpoint URL |
-
-## Available Profiles
-
-| Profile | Description |
-|---------|-------------|
-| `chrome116` | Chrome 116 on default platform |
-| `chrome131-macos` | Chrome 131 on macOS |
-| `chrome131-windows` | Chrome 131 on Windows |
-| `chrome131-linux` | Chrome 131 on Linux |
-
-## Binary Resolution
-
-The Python binding looks for the `chameleon` binary in this order:
-
-1. `binary_path` argument passed to constructor
-2. `CHAMELEON_BIN` environment variable
-3. `chameleon` on system `PATH`
-4. `./zig-out/bin/chameleon` (development build)
-5. Bundled binary in the package (if installed with binary distribution)
-
-## License
-
-AGPL-3.0 — see [LICENSE](../LICENSE).
+Context managers that:
+1. Find an available system port.
+2. Launch the Chameleon background executable bound to that port.
+3. Wait for the port to open.
+4. Launch the local Playwright engine.
+5. Call `connect_over_cdp` pointing to the spawned Chameleon instance.
+6. Yield the Playwright `Browser` object.
+7. Automatically tear down Playwright and terminate the Chameleon process when the block exits.
