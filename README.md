@@ -1,344 +1,275 @@
-<p align="center">
-  <a href="https://lightpanda.io"><img src="https://cdn.lightpanda.io/assets/images/logo/lpd-logo.png" alt="Logo" height=170></a>
-</p>
+# Lightpanda Browser (Enhanced Fingerprint Fork)
 
-<h1 align="center">Lightpanda Browser</h1>
+> **This project is forked from [lightpanda-io/browser](https://github.com/lightpanda-io/browser).**
+> The original Lightpanda is an excellent open-source headless browser written in Zig. This fork aims to **significantly enhance browser fingerprint spoofing capabilities**, making it harder for anti-bot systems to detect headless usage.
 
-<p align="center"><a href="https://lightpanda.io/">lightpanda.io</a></p>
+---
 
-<div align="center">
+## Why This Fork?
 
-[![License](https://img.shields.io/github/license/lightpanda-io/browser)](https://github.com/lightpanda-io/browser/blob/main/LICENSE)
-[![Twitter Follow](https://img.shields.io/twitter/follow/lightpanda_io)](https://twitter.com/lightpanda_io)
-[![GitHub stars](https://img.shields.io/github/stars/lightpanda-io/browser)](https://github.com/lightpanda-io/browser)
+The original Lightpanda browser is fast, lightweight, and supports CDP (Chrome DevTools Protocol). However, modern anti-bot systems (Cloudflare, Akamai, PerimeterX, DataDome, etc.) go far beyond simple User-Agent checks. They inspect:
 
-</div>
+- **TLS fingerprints** (JA3/JA4, cipher suite ordering)
+- **HTTP/2 settings** (SETTINGS frame, WINDOW_UPDATE, pseudo-header order)
+- **Canvas / WebGL fingerprints** (pixel-level rendering output)
+- **AudioContext fingerprints** (oscillator + compressor DSP pipeline)
+- **Navigator API consistency** (plugins, mimeTypes, permissions, languages)
+- **CSS feature detection** (matchMedia queries)
+- **Network header ordering** (Sec-CH-UA, Sec-Fetch-* headers)
 
-Lightpanda is the open-source browser made for headless usage:
+This fork integrates [curl-impersonate](https://github.com/lwthiker/curl-impersonate) and adds profile-driven fingerprint spoofing across all these layers, with a clear roadmap to reach production-grade anti-detection.
 
-- Javascript execution
-- Support of Web APIs (partial, WIP)
-- Compatible with Playwright[^1], Puppeteer, chromedp through [CDP](https://chromedevtools.github.io/devtools-protocol/)
+## Key Enhancements Over Upstream
 
-Fast web automation for AI agents, LLM training, scraping and testing:
+| Feature | Upstream | This Fork |
+|---------|----------|-----------|
+| TLS Fingerprint (JA3/JA4) | Default curl/BoringSSL | curl-impersonate with Chrome TLS profiles |
+| HTTP/2 Settings | Partial | Full Chrome-matching SETTINGS/WINDOW_UPDATE/pseudo-headers |
+| Browser Profiles | None | Configurable profiles (chrome116, chrome131-macos, etc.) |
+| `window.chrome` object | Not present | Full runtime/app/csi/loadTimes implementation |
+| `navigator.webdriver` | `true` | `false` (passes WebDriver detection) |
+| Client Hints API | Not present | Full userAgentData with brands/platform/highEntropyValues |
+| Canvas Fingerprint | Not implemented | Seed-based generation (WIP: realistic rendering) |
+| AudioContext Fingerprint | Not implemented | Seed-based generation (WIP: DSP simulation) |
+| Screen/Display properties | Defaults | Profile-driven (resolution, colorDepth, DPR) |
+| V8 Heap Limits | Unlimited | Configurable memory limits + navigation loop protection |
+| Python Binding | None | `pip install lightpanda` for easy integration |
 
-- Ultra-low memory footprint (9x less than Chrome)
-- Exceptionally fast execution (11x faster than Chrome)
-- Instant startup
+## Detection Test Results
 
-[<img width="350px" src="https://cdn.lightpanda.io/assets/images/github/execution-time.svg">
-](https://github.com/lightpanda-io/demo)
-&emsp;
-[<img width="350px" src="https://cdn.lightpanda.io/assets/images/github/memory-frame.svg">
-](https://github.com/lightpanda-io/demo)
-</div>
+Tested against real-world anti-bot detection services:
 
-_Puppeteer requesting 100 pages from a local website on a AWS EC2 m5.large instance.
-See [benchmark details](https://github.com/lightpanda-io/demo)._
+| Detection Service | Result |
+|-------------------|--------|
+| [bot.sannysoft.com](https://bot.sannysoft.com) | 50% pass (basic checks all pass) |
+| [AreYouHeadless](https://arh.antoinevastel.com/bots/areyouheadless) | **PASS** |
+| [tls.peet.ws](https://tls.peet.ws/api/all) | HTTP/2 match, TLS profile match |
+| [BrowserLeaks Canvas](https://browserleaks.com/canvas) | Canvas API present (fingerprint WIP) |
 
-[^1]: **Playwright support disclaimer:**
-Due to the nature of Playwright, a script that works with the current version of the browser may not function correctly with a future version. Playwright uses an intermediate JavaScript layer that selects an execution strategy based on the browser's available features. If Lightpanda adds a new [Web API](https://developer.mozilla.org/en-US/docs/Web/API), Playwright may choose to execute different code for the same script. This new code path could attempt to use features that are not yet implemented. Lightpanda makes an effort to add compatibility tests, but we can't cover all scenarios. If you encounter an issue, please create a [GitHub issue](https://github.com/lightpanda-io/browser/issues) and include the last known working version of the script.
+See the full [Fingerprint Audit Report](docs/fingerprint-audit-report.md) for details.
 
-## Quick start
+## Quick Start
 
-### Install
-**Install from the nightly builds**
+### Option 1: Python Binding (Recommended)
 
-You can download the last binary from the [nightly
-builds](https://github.com/lightpanda-io/browser/releases/tag/nightly) for
-Linux x86_64 and MacOS aarch64.
+The easiest way to use this project is through the Python binding:
 
-*For Linux*
-```console
-curl -L -o lightpanda https://github.com/lightpanda-io/browser/releases/download/nightly/lightpanda-x86_64-linux && \
-chmod a+x ./lightpanda
+```bash
+pip install chameleon-browser
 ```
 
-*For MacOS*
-```console
-curl -L -o lightpanda https://github.com/lightpanda-io/browser/releases/download/nightly/lightpanda-aarch64-macos && \
-chmod a+x ./lightpanda
+```python
+from lightpanda import LightpandaBrowser
+
+# Basic usage - fetch a page
+browser = LightpandaBrowser()
+html = browser.fetch("https://example.com")
+print(html)
+
+# With fingerprint profile
+browser = LightpandaBrowser(profile="chrome131-macos")
+html = browser.fetch("https://bot.sannysoft.com")
+
+# Start a CDP server for Puppeteer/Playwright
+server = browser.serve(host="127.0.0.1", port=9222)
+# Then connect with Puppeteer:
+#   puppeteer.connect({ browserWSEndpoint: "ws://127.0.0.1:9222" })
+server.stop()
 ```
 
-*For Windows + WSL2*
+See [python/README.md](python/README.md) for full Python API documentation.
 
-The Lightpanda browser is compatible to run on windows inside WSL. Follow the Linux instruction for installation from a WSL terminal.
-It is recommended to install clients like Puppeteer on the Windows host.
+### Option 2: Binary
 
-**Install from Docker**
+Download pre-built binaries or build from source.
 
-Lightpanda provides [official Docker
-images](https://hub.docker.com/r/lightpanda/browser) for both Linux amd64 and
-arm64 architectures.
-The following command fetches the Docker image and starts a new container exposing Lightpanda's CDP server on port `9222`.
+**Fetch a URL:**
 ```console
-docker run -d --name lightpanda -p 9222:9222 lightpanda/browser:nightly
+./lightpanda fetch --browser chrome131-macos --dump https://example.com
 ```
 
-### Dump a URL
-
+**Start CDP server:**
 ```console
-./lightpanda fetch --obey_robots --log_format pretty  --log_level info https://demo-browser.lightpanda.io/campfire-commerce/
-```
-```console
-INFO  telemetry : telemetry status . . . . . . . . . . . . .  [+0ms]
-      disabled = false
-
-INFO  page : navigate . . . . . . . . . . . . . . . . . . . . [+6ms]
-      url = https://demo-browser.lightpanda.io/campfire-commerce/
-      method = GET
-      reason = address_bar
-      body = false
-      req_id = 1
-
-INFO  browser : executing script . . . . . . . . . . . . . .  [+118ms]
-      src = https://demo-browser.lightpanda.io/campfire-commerce/script.js
-      kind = javascript
-      cacheable = true
-
-INFO  http : request complete . . . . . . . . . . . . . . . . [+140ms]
-      source = xhr
-      url = https://demo-browser.lightpanda.io/campfire-commerce/json/product.json
-      status = 200
-      len = 4770
-
-INFO  http : request complete . . . . . . . . . . . . . . . . [+141ms]
-      source = fetch
-      url = https://demo-browser.lightpanda.io/campfire-commerce/json/reviews.json
-      status = 200
-      len = 1615
-<!DOCTYPE html>
+./lightpanda serve --browser chrome131-macos --host 127.0.0.1 --port 9222
 ```
 
-### Start a CDP server
-
-```console
-./lightpanda serve --obey_robots --log_format pretty  --log_level info --host 127.0.0.1 --port 9222
-```
-```console
-INFO  telemetry : telemetry status . . . . . . . . . . . . .  [+0ms]
-      disabled = false
-
-INFO  app : server running . . . . . . . . . . . . . . . . .  [+0ms]
-      address = 127.0.0.1:9222
-```
-
-Once the CDP server started, you can run a Puppeteer script by configuring the
-`browserWSEndpoint`.
-
+Then connect with Puppeteer:
 ```js
-'use strict'
-
 import puppeteer from 'puppeteer-core';
 
-// use browserWSEndpoint to pass the Lightpanda's CDP server address.
 const browser = await puppeteer.connect({
   browserWSEndpoint: "ws://127.0.0.1:9222",
 });
 
-// The rest of your script remains the same.
 const context = await browser.createBrowserContext();
 const page = await context.newPage();
+await page.goto('https://example.com', { waitUntil: "networkidle0" });
 
-// Dump all the links from the page.
-await page.goto('https://demo-browser.lightpanda.io/amiibo/', {waitUntil: "networkidle0"});
-
-const links = await page.evaluate(() => {
-  return Array.from(document.querySelectorAll('a')).map(row => {
-    return row.getAttribute('href');
-  });
-});
-
-console.log(links);
+const html = await page.content();
+console.log(html);
 
 await page.close();
 await context.close();
 await browser.disconnect();
 ```
 
-### Telemetry
-By default, Lightpanda collects and sends usage telemetry. This can be disabled by setting an environment variable `LIGHTPANDA_DISABLE_TELEMETRY=true`. You can read Lightpanda's privacy policy at: [https://lightpanda.io/privacy-policy](https://lightpanda.io/privacy-policy).
+### Option 3: Docker
 
-## Status
+```console
+docker run -d --name lightpanda -p 9222:9222 lightpanda/browser:nightly
+```
 
-Lightpanda is in Beta and currently a work in progress. Stability and coverage are improving and many websites now work.
-You may still encounter errors or crashes. Please open an issue with specifics if so.
+## Available Browser Profiles
 
-Here are the key features we have implemented:
+| Profile | UA Version | TLS Target | Use Case |
+|---------|-----------|------------|----------|
+| `chrome116` | Chrome/116 | chrome116 | Default, widest compatibility |
+| `chrome131-macos` | Chrome/131 | chrome116* | macOS simulation |
+| `chrome131-windows` | Chrome/131 | chrome116* | Windows simulation |
+| `chrome131-linux` | Chrome/131 | chrome116* | Linux simulation |
 
-- [x] HTTP loader ([Libcurl](https://curl.se/libcurl/))
-- [x] HTML parser ([html5ever](https://github.com/servo/html5ever))
-- [x] DOM tree
-- [x] Javascript support ([v8](https://v8.dev/))
-- [x] DOM APIs
-- [x] Ajax
-  - [x] XHR API
-  - [x] Fetch API
-- [x] DOM dump
-- [x] CDP/websockets server
-- [x] Click
-- [x] Input form
-- [x] Cookies
-- [x] Custom HTTP headers
-- [x] Proxy support
-- [x] Network interception
-- [x] Respect `robots.txt` with option `--obey_robots`
+*\* TLS target upgrade to chrome131 is on the roadmap (see [C-08 in audit report](docs/fingerprint-audit-report.md)).*
 
-NOTE: There are hundreds of Web APIs. Developing a browser (even just for headless mode) is a huge task. Coverage will increase over time.
-
-You can also follow the progress of our Javascript support in our dedicated [zig-js-runtime](https://github.com/lightpanda-io/zig-js-runtime#development) project.
-
-## Build from sources
+## Build from Source
 
 ### Prerequisites
 
-Lightpanda is written with [Zig](https://ziglang.org/) `0.15.2`. You have to
-install it with the right version in order to build the project.
+- [Zig](https://ziglang.org/) 0.15.2
+- [Rust](https://rust-lang.org/tools/install/) (for html5ever)
+- System dependencies:
 
-Lightpanda also depends on
-[zig-js-runtime](https://github.com/lightpanda-io/zig-js-runtime/) (with v8),
-[Libcurl](https://curl.se/libcurl/) and [html5ever](https://github.com/servo/html5ever).
-
-To be able to build the v8 engine for zig-js-runtime, you have to install some libs:
-
-For **Debian/Ubuntu based Linux**:
-
-```
-sudo apt install xz-utils ca-certificates \
-    pkg-config libglib2.0-dev \
-    clang make curl git
-```
-You also need to [install Rust](https://rust-lang.org/tools/install/).
-
-For systems with [**Nix**](https://nixos.org/download/), you can use the devShell:
-```
-nix develop
+**Debian/Ubuntu:**
+```bash
+sudo apt install xz-utils ca-certificates pkg-config libglib2.0-dev clang make curl git
 ```
 
-For **MacOS**, you need cmake and [Rust](https://rust-lang.org/tools/install/).
-```
+**macOS:**
+```bash
 brew install cmake
 ```
 
-### Install Git submodules
-
-The project uses git submodules for dependencies.
-
-To init or update the submodules in the `vendor/` directory:
-
+**Nix:**
+```bash
+nix develop
 ```
+
+### Build
+
+```bash
+# Initialize submodules (includes curl-impersonate)
 make install-submodule
+
+# Release build
+make build
+
+# Debug build
+make build-dev
+
+# Run tests
+make test
 ```
 
-This is an alias for `git submodule init && git submodule update`.
+### V8 Snapshot (optional, improves startup)
 
-### Build and run
-
-You an build the entire browser with `make build` or `make build-dev` for debug
-env.
-
-But you can directly use the zig command: `zig build run`.
-
-#### Embed v8 snapshot
-
-Lighpanda uses v8 snapshot. By default, it is created on startup but you can
-embed it by using the following commands:
-
-Generate the snapshot.
-```
+```bash
 zig build snapshot_creator -- src/snapshot.bin
-```
-
-Build using the snapshot binary.
-```
 zig build -Dsnapshot_path=../../snapshot.bin
 ```
 
-See [#1279](https://github.com/lightpanda-io/browser/pull/1279) for more details.
+## Project Status
 
-## Test
+This fork is in active development. The fingerprint spoofing layer is functional for basic anti-bot bypass but improvements are ongoing.
 
-### Unit Tests
+### Implemented
 
-You can test Lightpanda by running `make test`.
+- [x] HTTP loader with curl-impersonate (TLS fingerprint spoofing)
+- [x] HTML parser (html5ever from Servo)
+- [x] DOM tree + JavaScript support (V8)
+- [x] DOM APIs + Ajax (XHR/Fetch)
+- [x] CDP/WebSocket server (Puppeteer/Playwright compatible)
+- [x] Browser profile system (UA, screen, navigator properties)
+- [x] `window.chrome` object (runtime/app/csi/loadTimes)
+- [x] `navigator.webdriver = false`
+- [x] Client Hints API (userAgentData)
+- [x] Configurable screen/display properties
+- [x] Canvas/AudioContext/WebGL stub APIs with seed-based fingerprints
+- [x] RTCPeerConnection (blocks WebRTC IP leak)
+- [x] BatteryManager, Permissions API
+- [x] Cookies, custom HTTP headers, proxy support
+- [x] Network interception
+- [x] `robots.txt` support (`--obey_robots`)
+- [x] V8 heap memory limits + navigation loop protection
+- [x] Python binding (`pip install chameleon-browser`)
 
-### End to end tests
+### Roadmap
 
-To run end to end tests, you need to clone the [demo
-repository](https://github.com/lightpanda-io/demo) into `../demo` dir.
+- [ ] Canvas 2D: realistic pixel rendering (not just seed-based)
+- [ ] AudioContext: DSP pipeline simulation
+- [ ] WebGL: actual draw call → readPixels pipeline
+- [ ] matchMedia(): CSS media query evaluation
+- [ ] PluginArray.item() returning real Plugin objects
+- [ ] Notification API stub
+- [ ] fetch()/XHR standard headers (Sec-Fetch-*, Sec-CH-UA)
+- [ ] HTTP header ordering matching Chrome
+- [ ] Upgrade TLS target to chrome131/132
+- [ ] navigator.bluetooth/usb stubs
+- [ ] WebSocket Web API
+- [ ] CreepJS / FingerprintJS test suite pass
 
-You have to install the [demo's node
-requirements](https://github.com/lightpanda-io/demo?tab=readme-ov-file#dependencies-1)
+## Fingerprint Benchmark Tool
 
-You also need to install [Go](https://go.dev) > v1.24.
+Included benchmark tool to compare fingerprint quality:
+
+```bash
+python3 lp_fingerprint_benchmark.py --browser chrome116 --tls-runs 5
+```
+
+This compares curl vs. Lightpanda across multiple sites and validates TLS fingerprint stability. See [lp_fingerprint_benchmark.py](lp_fingerprint_benchmark.py) for details.
+
+## Architecture
 
 ```
-make end2end
+lightpanda-browser/
+├── src/                    # Zig source code
+│   ├── browser/            # Browser engine core
+│   │   ├── Browser.zig     # Browser implementation
+│   │   ├── Page.zig        # Page + HTTP header management
+│   │   ├── js/             # JavaScript runtime bindings
+│   │   └── webapi/         # Web API implementations (Canvas, Audio, WebGL, etc.)
+│   ├── cdp/                # Chrome DevTools Protocol
+│   ├── http/               # HTTP client (curl-impersonate integration)
+│   └── main.zig            # Entry point
+├── python/                 # Python binding package
+│   ├── lightpanda/         # Python source
+│   └── pyproject.toml      # pip install configuration
+├── vendor/                 # Vendored dependencies
+│   ├── curl/               # curl (forked with fingerprint patches)
+│   ├── curl-impersonate/   # TLS fingerprint impersonation
+│   ├── nghttp2/            # HTTP/2
+│   ├── brotli/             # Brotli compression
+│   └── zlib/               # zlib compression
+├── docs/                   # Documentation
+│   └── fingerprint-audit-report.md
+└── tests/                  # Test suites (WPT, unit tests)
 ```
-
-### Web Platform Tests
-
-Lightpanda is tested against the standardized [Web Platform
-Tests](https://web-platform-tests.org/).
-
-The relevant tests cases are committed in a [dedicated repository](https://github.com/lightpanda-io/wpt) which is fetched by the `make install-submodule` command.
-
-All the tests cases executed are located in the `tests/wpt` sub-directory.
-
-For reference, you can easily execute a WPT test case with your browser via
-[wpt.live](https://wpt.live).
-
-#### Run WPT test suite
-
-To run all the tests:
-
-```
-make wpt
-```
-
-Or one specific test:
-
-```
-make wpt Node-childNodes.html
-```
-
-#### Add a new WPT test case
-
-We add new relevant tests cases files when we implemented changes in Lightpanda.
-
-To add a new test, copy the file you want from the [WPT
-repo](https://github.com/web-platform-tests/wpt) into the `tests/wpt` directory.
-
-:warning: Please keep the original directory tree structure of `tests/wpt`.
 
 ## Contributing
 
-Lightpanda accepts pull requests through GitHub.
+Contributions are welcome. This project is independently maintained.
 
-You have to sign our [CLA](CLA.md) during the pull request process otherwise
-we're not able to accept your contributions.
+For issues specific to the fingerprint enhancement features, please open an issue on [this repository](https://github.com/chameleon-browser/chameleon-browser/issues).
 
-## Why?
+For issues with the core browser engine, consider also checking the [upstream project](https://github.com/lightpanda-io/browser/issues).
 
-### Javascript execution is mandatory for the modern web
+## License
 
-In the good old days, scraping a webpage was as easy as making an HTTP request, cURL-like. It’s not possible anymore, because Javascript is everywhere, like it or not:
+This project inherits the [AGPL-3.0](LICENSE) license from the upstream project.
 
-- Ajax, Single Page App, infinite loading, “click to display”, instant search, etc.
-- JS web frameworks: React, Vue, Angular & others
+Original project: [lightpanda-io/browser](https://github.com/lightpanda-io/browser) by [Lightpanda (Selecy SAS)](https://lightpanda.io).
 
-### Chrome is not the right tool
+## Acknowledgments
 
-If we need Javascript, why not use a real web browser? Take a huge desktop application, hack it, and run it on the server. Hundreds or thousands of instances of Chrome if you use it at scale. Are you sure it’s such a good idea?
-
-- Heavy on RAM and CPU, expensive to run
-- Hard to package, deploy and maintain at scale
-- Bloated, lots of features are not useful in headless usage
-
-### Lightpanda is built for performance
-
-If we want both Javascript and performance in a true headless browser, we need to start from scratch. Not another iteration of Chromium, really from a blank page. Crazy right? But that’s what we did:
-
-- Not based on Chromium, Blink or WebKit
-- Low-level system programming language (Zig) with optimisations in mind
-- Opinionated: without graphical rendering
+- [Lightpanda](https://lightpanda.io) — the original headless browser project
+- [curl-impersonate](https://github.com/lwthiker/curl-impersonate) — TLS fingerprint impersonation
+- [V8](https://v8.dev/) — JavaScript engine
+- [html5ever](https://github.com/servo/html5ever) — HTML parser from Servo

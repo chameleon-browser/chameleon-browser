@@ -1,0 +1,66 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chameleon-browser"
+version = "0.1.0"
+description = "Python binding for Lightpanda headless browser with enhanced fingerprint spoofing"
+readme = "README.md"
+license = {text = "AGPL-3.0"}
+requires-python = ">=3.8"
+authors = [
+    {name = "kylin1020"},
+]
+keywords = [
+    "headless-browser",
+    "fingerprint",
+    "anti-detection",
+    "web-scraping",
+    "browser-automation",
+    "cdp",
+    "puppeteer",
+    "playwright",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: WWW/HTTP :: Browsers",
+    "Topic :: Software Development :: Testing",
+]
+dependencies = [
+    "websockets>=11.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+]
+
+[project.urls]
+Homepage = "https://github.com/chameleon-browser/chameleon-browser"
+Repository = "https://github.com/chameleon-browser/chameleon-browser"
+Issues = "https://github.com/chameleon-browser/chameleon-browser/issues"
+Documentation = "https://github.com/chameleon-browser/chameleon-browser/tree/main/python"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["lightpanda*"]
+
+[tool.setuptools.package-data]
+lightpanda = ["bin/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
