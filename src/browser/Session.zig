@@ -201,11 +201,21 @@ pub const WaitResult = enum {
 };
 
 pub fn wait(self: *Session, wait_ms: u32) WaitResult {
+    // Limit the number of consecutive navigations to prevent infinite
+    // navigation loops (e.g., JS repeatedly setting window.location).
+    var navigation_count: u32 = 0;
+    const max_navigations: u32 = 20;
+
     while (true) {
         if (self.page) |*page| {
             switch (page.wait(wait_ms)) {
                 .done => {
                     if (page._queued_navigation == null) {
+                        return .done;
+                    }
+                    navigation_count += 1;
+                    if (navigation_count >= max_navigations) {
+                        log.warn(.browser, "max navigation limit reached", .{ .count = navigation_count });
                         return .done;
                     }
                     self.processScheduledNavigation() catch return .done;

@@ -37,12 +37,15 @@ pub const FetchOpts = struct {
     wait_ms: u32 = 5000,
     dump: dump.RootOpts,
     writer: ?*std.Io.Writer = null,
+    max_heap_size: u64 = 512 * 1024 * 1024, // 512 MB default
 };
 pub fn fetch(app: *App, url: [:0]const u8, opts: FetchOpts) !void {
     const notification = try Notification.init(app.allocator);
     defer notification.deinit();
 
-    var browser = try Browser.init(app, .{});
+    var browser = try Browser.init(app, .{
+        .max_heap_size = opts.max_heap_size,
+    });
     defer browser.deinit();
 
     var session = try browser.newSession(notification);

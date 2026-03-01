@@ -75,6 +75,8 @@ inspector: ?*Inspector,
 
 pub const InitOpts = struct {
     with_inspector: bool = false,
+    /// Maximum heap size in bytes for the V8 isolate. 0 means no limit.
+    max_heap_size: u64 = 0,
 };
 
 pub fn init(app: *App, opts: InitOpts) !Env {
@@ -85,6 +87,18 @@ pub fn init(app: *App, opts: InitOpts) !Env {
     errdefer allocator.destroy(params);
     v8.v8__Isolate__CreateParams__CONSTRUCT(params);
     params.snapshot_blob = @ptrCast(&snapshot.startup_data);
+
+    // Set V8 heap memory limits to prevent unbounded memory growth.
+    // Without this, a heavy JS page can allocate unlimited memory, triggering
+    // system-wide memory pressure that freezes the entire machine.
+    if (opts.max_heap_size > 0) {
+        v8.v8__ResourceConstraints__ConfigureDefaultsFromHeapSize(
+            &params.constraints,
+            0, // initial_heap_size: let V8 decide
+            @intCast(opts.max_heap_size),
+        );
+        log.info(.browser, "V8 heap limit configured", .{ .max_heap_size = opts.max_heap_size });
+    }
 
     params.array_buffer_allocator = v8.v8__ArrayBuffer__Allocator__NewDefaultAllocator().?;
     errdefer v8.v8__ArrayBuffer__Allocator__DELETE(params.array_buffer_allocator.?);

@@ -51,12 +51,15 @@ transfer_arena: ArenaAllocator,
 
 const InitOpts = struct {
     env: js.Env.InitOpts = .{},
+    max_heap_size: u64 = 0,
 };
 
 pub fn init(app: *App, opts: InitOpts) !Browser {
     const allocator = app.allocator;
 
-    var env = try js.Env.init(app, opts.env);
+    var env_opts = opts.env;
+    env_opts.max_heap_size = opts.max_heap_size;
+    var env = try js.Env.init(app, env_opts);
     errdefer env.deinit();
 
     return .{

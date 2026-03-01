@@ -525,7 +525,7 @@ test "tests:afterAll" {
 
 fn serveCDP(wg: *std.Thread.WaitGroup) !void {
     const address = try std.net.Address.parseIp("127.0.0.1", 9583);
-    test_cdp_server = try Server.init(test_app, address);
+    test_cdp_server = try Server.init(test_app, address, 0);
 
     wg.finish();
 

@@ -44,8 +44,9 @@ allocator: Allocator,
 client: ?posix.socket_t,
 listener: ?posix.socket_t,
 json_version_response: []const u8,
+max_heap_size: u64,
 
-pub fn init(app: *App, address: net.Address) !Server {
+pub fn init(app: *App, address: net.Address, max_heap_size: u64) !Server {
     const allocator = app.allocator;
     const json_version_response = try buildJSONVersionResponse(allocator, address);
     errdefer allocator.free(json_version_response);
@@ -56,6 +57,7 @@ pub fn init(app: *App, address: net.Address) !Server {
         .listener = null,
         .allocator = allocator,
         .json_version_response = json_version_response,
+        .max_heap_size = max_heap_size,
     };
 }
 
@@ -472,7 +474,7 @@ pub const Client = struct {
             break :blk res;
         };
 
-        self.mode = .{ .cdp = try CDP.init(self.server.app, self) };
+        self.mode = .{ .cdp = try CDP.init(self.server.app, self, self.server.max_heap_size) };
         return self.send(response);
     }
 

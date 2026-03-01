@@ -85,10 +85,11 @@ pub fn CDPT(comptime TypeProvider: type) type {
 
         const Self = @This();
 
-        pub fn init(app: *App, client: TypeProvider.Client) !Self {
+        pub fn init(app: *App, client: TypeProvider.Client, max_heap_size: u64) !Self {
             const allocator = app.allocator;
             const browser = try Browser.init(app, .{
                 .env = .{ .with_inspector = true },
+                .max_heap_size = max_heap_size,
             });
             errdefer browser.deinit();
 

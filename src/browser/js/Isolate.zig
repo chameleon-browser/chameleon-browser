@@ -53,6 +53,18 @@ pub fn enqueueMicrotaskFunc(self: Isolate, function: js.Function) void {
     v8.v8__Isolate__EnqueueMicrotaskFunc(self.handle, function.handle);
 }
 
+pub fn terminateExecution(self: Isolate) void {
+    v8.v8__Isolate__TerminateExecution(self.handle);
+}
+
+pub fn isExecutionTerminating(self: Isolate) bool {
+    return v8.v8__Isolate__IsExecutionTerminating(self.handle);
+}
+
+pub fn cancelTerminateExecution(self: Isolate) void {
+    v8.v8__Isolate__CancelTerminateExecution(self.handle);
+}
+
 pub fn lowMemoryNotification(self: Isolate) void {
     v8.v8__Isolate__LowMemoryNotification(self.handle);
 }
