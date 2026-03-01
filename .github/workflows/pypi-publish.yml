@@ -1,0 +1,46 @@
+name: Publish Python Package to PyPI
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:  # Allow manual trigger for debugging/testing
+
+jobs:
+  build-and-publish:
+    name: Build and publish to PyPI
+    runs-on: ubuntu-latest
+    
+    # These permissions are required for PyPI Trusted Publishing
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+    - name: Checkout source
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.x"
+
+    - name: Install build dependencies
+      run: python -m pip install --upgrade pip build twine
+
+    - name: Build package
+      working-directory: ./python
+      run: python -m build
+
+    - name: Check package metadata
+      working-directory: ./python
+      run: twine check dist/*
+
+    # Uses PyPI Trusted Publishing (OIDC). You must configure this in your PyPI project settings.
+    # Alternatively, you can use a traditional API token by uncommenting the block below.
+    - name: Publish package to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        packages-dir: python/dist/
+        # To use PyPI Trusted Publishing, do NOT provide a password.
+        # If you prefer token-based auth, uncomment the line below and set PYPI_API_TOKEN in GitHub Secrets.
+        # password: ${{ secrets.PYPI_API_TOKEN }}
