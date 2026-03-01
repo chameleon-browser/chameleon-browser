@@ -11,3 +11,4 @@ lightpanda.id
 src/snapshot.bin
 .artifacts
 .env__pycache__/
+python/chameleon/__pycache__/
