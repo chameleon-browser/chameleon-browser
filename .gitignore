@@ -1,14 +1,61 @@
-zig-cache
-/.zig-cache/
-/.lp-cache/
-zig-out
-/vendor/netsurf/out
-/vendor/libiconv/
+zig-cache/
+.zig-cache/
+.lp-cache/
+zig-out/
+
+# Vendor build outputs
+vendor/netsurf/out/
+vendor/libiconv/
+src/html5ever/target/
+v8/
+build/
+
+# IDE & Editor
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Local settings
+.env
 lightpanda.id
-/v8/
-/build/
-/src/html5ever/target/
+
+# Build artifacts
+.artifacts/
 src/snapshot.bin
-.artifacts
-.env__pycache__/
-python/chameleon/__pycache__/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Pytest & Coverage
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+pytestdebug.log
