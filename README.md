@@ -62,12 +62,13 @@ with browser.connect() as pw_browser:
     # Navigate to a test page
     page.goto("https://bot.sannysoft.com")
     
-    # Extract data using the DOM (Screenshots are NOT supported)
-    html_content = page.content()
-    page_title = page.title()
+    try:
+        # This will raise an error because Chameleon does not render pixels!
+        page.screenshot(path="sannysoft_report.png")
+    except Exception as e:
+        print(f"Screenshot failed as expected: {e}")
     
-    print(f"Title: {page_title}")
-    print(f"Content Length: {len(html_content)} bytes")
+    print(f"Title: {page.title()}")
 ```
 
 <details>
@@ -84,6 +85,12 @@ async def main():
         page = context.pages[0]
         await page.goto("https://bot.sannysoft.com")
         
+        try:
+            # Screenshots are not supported and will raise an error
+            await page.screenshot(path="sannysoft_report.png")
+        except Exception as e:
+            print(f"Expected error: {e}")
+            
         # Extract the page title
         title = await page.title()
         print(f"Title: {title}")
