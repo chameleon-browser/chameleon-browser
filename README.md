@@ -25,6 +25,14 @@ Chameleon Browser modifies the browser engine at the lowest levels to spoof:
 - **Navigator APIs:** Injects realistic `plugins`, `mimeTypes`, `permissions`, and `languages` arrays.
 - **Client Hints:** Fully implements `navigator.userAgentData` with high-entropy values.
 
+## ⚠️ Important Note: Rendering and Screenshots
+
+**Chameleon Browser does not actually render visual pixels to a screen or buffer.** 
+
+Because it is designed purely for high-performance scraping, DOM manipulation, and script execution, the engine deliberately omits the heavy graphics rendering pipeline. 
+
+As a result, **features like screenshots (`page.screenshot()`) or PDF generation are not supported.** Any attempt to use visual commands will either be ignored or return an error. You should use DOM extraction methods (like `page.content()`, `page.evaluate()`, or `page.locator()`) to interact with the page instead.
+
 ## Quick Start (Python)
 
 The easiest way to use Chameleon Browser is via our official Python binding, which seamlessly integrates with **Playwright**. It automatically manages the CDP server lifecycle and returns a native Playwright `Browser` instance.
@@ -32,8 +40,9 @@ The easiest way to use Chameleon Browser is via our official Python binding, whi
 ### Installation
 
 ```bash
+# Only install the python packages. 
+# There is NO NEED to run `playwright install chromium` because Chameleon is its own browser engine!
 pip install chameleon-browser playwright
-playwright install chromium
 ```
 
 ### Usage
@@ -50,8 +59,9 @@ with browser.connect() as pw_browser:
     context = pw_browser.contexts[0]
     page = context.pages[0]
     
+    # Navigate to a test page
     page.goto("https://bot.sannysoft.com")
-    page.screenshot(path="sannysoft_report.png")
+    
     print(f"Title: {page.title()}")
 ```
 
@@ -99,6 +109,7 @@ If you prefer not to use Python, you can download the standalone binary and conn
 ```js
 import puppeteer from 'puppeteer-core';
 
+// Connect Playwright/Puppeteer directly to Chameleon's WebSocket endpoint
 const browser = await puppeteer.connect({
   browserWSEndpoint: "ws://127.0.0.1:9222",
 });
@@ -106,6 +117,9 @@ const browser = await puppeteer.connect({
 const context = await browser.createBrowserContext();
 const page = await context.newPage();
 await page.goto('https://bot.sannysoft.com');
+
+const title = await page.title();
+console.log(`Page title: ${title}`);
 ```
 
 ## Build from Source
