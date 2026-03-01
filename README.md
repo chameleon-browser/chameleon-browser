@@ -85,12 +85,12 @@ Download pre-built binaries or build from source.
 
 **Fetch a URL:**
 ```console
-./lightpanda fetch --browser chrome131-macos --dump https://example.com
+./chameleon fetch --browser chrome131-macos --dump https://example.com
 ```
 
 **Start CDP server:**
 ```console
-./lightpanda serve --browser chrome131-macos --host 127.0.0.1 --port 9222
+./chameleon serve --browser chrome131-macos --host 127.0.0.1 --port 9222
 ```
 
 Then connect with Puppeteer:
@@ -116,7 +116,7 @@ await browser.disconnect();
 ### Option 3: Docker
 
 ```console
-docker run -d --name lightpanda -p 9222:9222 lightpanda/browser:nightly
+docker run -d --name lightpanda -p 9222:9222 chameleon-browser/chameleon-browser:nightly
 ```
 
 ## Available Browser Profiles
@@ -221,10 +221,10 @@ This fork is in active development. The fingerprint spoofing layer is functional
 Included benchmark tool to compare fingerprint quality:
 
 ```bash
-python3 lp_fingerprint_benchmark.py --browser chrome116 --tls-runs 5
+python3 chameleon_benchmark.py --browser chrome116 --tls-runs 5
 ```
 
-This compares curl vs. Lightpanda across multiple sites and validates TLS fingerprint stability. See [lp_fingerprint_benchmark.py](lp_fingerprint_benchmark.py) for details.
+This compares curl vs. Lightpanda across multiple sites and validates TLS fingerprint stability. See [chameleon_benchmark.py](chameleon_benchmark.py) for details.
 
 ## Architecture
 

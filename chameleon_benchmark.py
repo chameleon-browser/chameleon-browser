@@ -249,7 +249,7 @@ def compare_value(curl_result: FetchResult, lp_result: FetchResult) -> str:
 
 def build_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="curl vs Lightpanda benchmark + fingerprint stability probe")
-    parser.add_argument("--lightpanda", default="./zig-out/bin/lightpanda", help="path to lightpanda binary")
+    parser.add_argument("--lightpanda", default="./zig-out/bin/chameleon", help="path to lightpanda binary")
     parser.add_argument("--browser", default="chrome116", help="fixed browser profile for Lightpanda")
     parser.add_argument("--timeout", type=int, default=35, help="request timeout in seconds")
     parser.add_argument("--tls-runs", type=int, default=5, help="number of tls.peet.ws probe runs")

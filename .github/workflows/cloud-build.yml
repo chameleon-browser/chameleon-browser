@@ -59,13 +59,13 @@ jobs:
         run: zig build -Dsnapshot_path=../../snapshot.bin -Dprebuilt_v8_path=v8/libc_v8.a -Doptimize=ReleaseFast -Dcpu=x86_64 -Dgit_commit=$(git rev-parse --short ${{ github.sha }})
 
       - name: Rename binary
-        run: mv zig-out/bin/lightpanda lightpanda-x86_64-linux
+        run: mv zig-out/bin/chameleon chameleon-x86_64-linux
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
-          name: lightpanda-x86_64-linux
-          path: lightpanda-x86_64-linux
+          name: chameleon-x86_64-linux
+          path: chameleon-x86_64-linux
           if-no-files-found: error
           retention-days: 7
 
@@ -94,12 +94,12 @@ jobs:
         run: zig build -Dsnapshot_path=../../snapshot.bin -Dprebuilt_v8_path=v8/libc_v8.a -Doptimize=ReleaseFast -Dcpu=generic -Dgit_commit=$(git rev-parse --short ${{ github.sha }})
 
       - name: Rename binary
-        run: mv zig-out/bin/lightpanda lightpanda-aarch64-linux
+        run: mv zig-out/bin/chameleon chameleon-aarch64-linux
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
-          name: lightpanda-aarch64-linux
-          path: lightpanda-aarch64-linux
+          name: chameleon-aarch64-linux
+          path: chameleon-aarch64-linux
           if-no-files-found: error
           retention-days: 7

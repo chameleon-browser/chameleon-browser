@@ -65,7 +65,7 @@ Main class for interacting with the Lightpanda browser.
 
 ```python
 LightpandaBrowser(
-    binary_path=None,     # Path to lightpanda binary (auto-detected if None)
+    binary_path=None,     # Path to chameleon binary (auto-detected if None)
     profile=None,         # Browser fingerprint profile (e.g., "chrome131-macos")
     log_level="error",    # Log level: "error", "warn", "info", "debug"
     log_format="pretty",  # Log format: "pretty", "json"
@@ -109,9 +109,9 @@ Returned by `browser.cdp_server()`. Use as a context manager.
 The Python binding looks for the `lightpanda` binary in this order:
 
 1. `binary_path` argument passed to constructor
-2. `LIGHTPANDA_BIN` environment variable
+2. `CHAMELEON_BIN` environment variable
 3. `lightpanda` on system `PATH`
-4. `./zig-out/bin/lightpanda` (development build)
+4. `./zig-out/bin/chameleon` (development build)
 5. Bundled binary in the package (if installed with binary distribution)
 
 ## License

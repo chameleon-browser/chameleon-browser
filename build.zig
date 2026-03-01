@@ -59,7 +59,7 @@ pub fn build(b: *Build) !void {
     {
         // browser
         const exe = b.addExecutable(.{
-            .name = "lightpanda",
+            .name = "chameleon",
             .use_llvm = true,
             .root_module = b.createModule(.{
                 .root_source_file = b.path("src/main.zig"),
@@ -68,7 +68,7 @@ pub fn build(b: *Build) !void {
                 .sanitize_c = enable_csan,
                 .sanitize_thread = enable_tsan,
                 .imports = &.{
-                    .{ .name = "lightpanda", .module = lightpanda_module },
+                    .{ .name = "chameleon", .module = lightpanda_module },
                 },
             }),
         });
@@ -92,7 +92,7 @@ pub fn build(b: *Build) !void {
                 .target = target,
                 .optimize = optimize,
                 .imports = &.{
-                    .{ .name = "lightpanda", .module = lightpanda_module },
+                    .{ .name = "chameleon", .module = lightpanda_module },
                 },
             }),
         });
@@ -130,7 +130,7 @@ pub fn build(b: *Build) !void {
                 .sanitize_c = enable_csan,
                 .sanitize_thread = enable_tsan,
                 .imports = &.{
-                    .{ .name = "lightpanda", .module = lightpanda_module },
+                    .{ .name = "chameleon", .module = lightpanda_module },
                 },
             }),
         });
@@ -156,7 +156,7 @@ pub fn build(b: *Build) !void {
                 .sanitize_c = enable_csan,
                 .sanitize_thread = enable_tsan,
                 .imports = &.{
-                    .{ .name = "lightpanda", .module = lightpanda_module },
+                    .{ .name = "chameleon", .module = lightpanda_module },
                 },
             }),
         });
