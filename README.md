@@ -1,4 +1,4 @@
-# Lightpanda Browser (Enhanced Fingerprint Fork)
+# Chameleon Browser
 
 > **This project is forked from [lightpanda-io/browser](https://github.com/lightpanda-io/browser).**
 > The original Lightpanda is an excellent open-source headless browser written in Zig. This fork aims to **significantly enhance browser fingerprint spoofing capabilities**, making it harder for anti-bot systems to detect headless usage.
@@ -33,7 +33,7 @@ This fork integrates [curl-impersonate](https://github.com/lwthiker/curl-imperso
 | AudioContext Fingerprint | Not implemented | Seed-based generation (WIP: DSP simulation) |
 | Screen/Display properties | Defaults | Profile-driven (resolution, colorDepth, DPR) |
 | V8 Heap Limits | Unlimited | Configurable memory limits + navigation loop protection |
-| Python Binding | None | `pip install lightpanda` for easy integration |
+| Python Binding | None | `pip install chameleon-browser` for easy integration |
 
 ## Detection Test Results
 
@@ -59,15 +59,15 @@ pip install chameleon-browser
 ```
 
 ```python
-from lightpanda import LightpandaBrowser
+from chameleon import ChameleonBrowser
 
 # Basic usage - fetch a page
-browser = LightpandaBrowser()
+browser = ChameleonBrowser()
 html = browser.fetch("https://example.com")
 print(html)
 
 # With fingerprint profile
-browser = LightpandaBrowser(profile="chrome131-macos")
+browser = ChameleonBrowser(profile="chrome131-macos")
 html = browser.fetch("https://bot.sannysoft.com")
 
 # Start a CDP server for Puppeteer/Playwright
@@ -116,7 +116,7 @@ await browser.disconnect();
 ### Option 3: Docker
 
 ```console
-docker run -d --name lightpanda -p 9222:9222 chameleon-browser/chameleon-browser:nightly
+docker run -d --name chameleon -p 9222:9222 chameleon-browser/chameleon-browser:nightly
 ```
 
 ## Available Browser Profiles
@@ -224,12 +224,12 @@ Included benchmark tool to compare fingerprint quality:
 python3 chameleon_benchmark.py --browser chrome116 --tls-runs 5
 ```
 
-This compares curl vs. Lightpanda across multiple sites and validates TLS fingerprint stability. See [chameleon_benchmark.py](chameleon_benchmark.py) for details.
+This compares curl vs. Chameleon across multiple sites and validates TLS fingerprint stability. See [chameleon_benchmark.py](chameleon_benchmark.py) for details.
 
 ## Architecture
 
 ```
-lightpanda-browser/
+chameleon-browser/
 ├── src/                    # Zig source code
 │   ├── browser/            # Browser engine core
 │   │   ├── Browser.zig     # Browser implementation
@@ -240,7 +240,7 @@ lightpanda-browser/
 │   ├── http/               # HTTP client (curl-impersonate integration)
 │   └── main.zig            # Entry point
 ├── python/                 # Python binding package
-│   ├── lightpanda/         # Python source
+│   ├── chameleon/         # Python source
 │   └── pyproject.toml      # pip install configuration
 ├── vendor/                 # Vendored dependencies
 │   ├── curl/               # curl (forked with fingerprint patches)

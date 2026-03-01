@@ -56,10 +56,10 @@ Documentation = "https://github.com/chameleon-browser/chameleon-browser/tree/mai
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["lightpanda*"]
+include = ["chameleon*"]
 
 [tool.setuptools.package-data]
-lightpanda = ["bin/*"]
+chameleon = ["bin/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

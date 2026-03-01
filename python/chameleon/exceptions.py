@@ -1,15 +1,15 @@
-"""Exception classes for the Lightpanda Python binding."""
+"""Exception classes for the Chameleon Python binding."""
 
 
-class LightpandaError(Exception):
-    """Base exception for all Lightpanda errors."""
+class ChameleonError(Exception):
+    """Base exception for all Chameleon errors."""
 
 
-class BinaryNotFoundError(LightpandaError):
-    """Raised when the lightpanda binary cannot be found."""
+class BinaryNotFoundError(ChameleonError):
+    """Raised when the chameleon binary cannot be found."""
 
 
-class FetchError(LightpandaError):
+class FetchError(ChameleonError):
     """Raised when a fetch operation fails."""
 
     def __init__(self, message: str, returncode: int | None = None, stderr: str = ""):
@@ -18,9 +18,9 @@ class FetchError(LightpandaError):
         self.stderr = stderr
 
 
-class ServerError(LightpandaError):
+class ServerError(ChameleonError):
     """Raised when the CDP server fails to start or encounters an error."""
 
 
-class TimeoutError(LightpandaError):
+class TimeoutError(ChameleonError):
     """Raised when an operation times out."""

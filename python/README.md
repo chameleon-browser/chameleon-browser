@@ -1,6 +1,6 @@
-# Lightpanda Python Binding
+# Chameleon Python Binding
 
-Python wrapper for the [Lightpanda headless browser](https://github.com/chameleon-browser/chameleon-browser) with enhanced fingerprint spoofing capabilities.
+Python wrapper for the [Chameleon headless browser](https://github.com/chameleon-browser/chameleon-browser) with enhanced fingerprint spoofing capabilities.
 
 ## Installation
 
@@ -13,9 +13,9 @@ pip install chameleon-browser
 ### Fetch a Page
 
 ```python
-from lightpanda import LightpandaBrowser
+from chameleon import ChameleonBrowser
 
-browser = LightpandaBrowser()
+browser = ChameleonBrowser()
 html = browser.fetch("https://example.com")
 print(html)
 ```
@@ -23,16 +23,16 @@ print(html)
 ### With Fingerprint Profile
 
 ```python
-browser = LightpandaBrowser(profile="chrome131-macos")
+browser = ChameleonBrowser(profile="chrome131-macos")
 html = browser.fetch("https://bot.sannysoft.com")
 ```
 
 ### Start CDP Server (for Puppeteer/Playwright)
 
 ```python
-from lightpanda import LightpandaBrowser
+from chameleon import ChameleonBrowser
 
-browser = LightpandaBrowser(profile="chrome131-macos")
+browser = ChameleonBrowser(profile="chrome131-macos")
 
 # Start CDP server (blocks until stop() or context manager exit)
 with browser.cdp_server(host="127.0.0.1", port=9222) as server:
@@ -45,10 +45,10 @@ with browser.cdp_server(host="127.0.0.1", port=9222) as server:
 
 ```python
 import asyncio
-from lightpanda import LightpandaBrowser
+from chameleon import ChameleonBrowser
 
 async def main():
-    browser = LightpandaBrowser(profile="chrome131-macos")
+    browser = ChameleonBrowser(profile="chrome131-macos")
     html = await browser.async_fetch("https://example.com")
     print(html)
 
@@ -57,14 +57,14 @@ asyncio.run(main())
 
 ## API Reference
 
-### `LightpandaBrowser`
+### `ChameleonBrowser`
 
-Main class for interacting with the Lightpanda browser.
+Main class for interacting with the Chameleon browser.
 
 #### Constructor
 
 ```python
-LightpandaBrowser(
+ChameleonBrowser(
     binary_path=None,     # Path to chameleon binary (auto-detected if None)
     profile=None,         # Browser fingerprint profile (e.g., "chrome131-macos")
     log_level="error",    # Log level: "error", "warn", "info", "debug"
@@ -82,7 +82,7 @@ LightpandaBrowser(
 | `fetch(url)` | Fetch a URL and return the rendered HTML |
 | `async_fetch(url)` | Async version of fetch |
 | `cdp_server(host, port)` | Start a CDP WebSocket server |
-| `version()` | Get the Lightpanda binary version |
+| `version()` | Get the Chameleon binary version |
 
 ### `CDPServer`
 
@@ -106,11 +106,11 @@ Returned by `browser.cdp_server()`. Use as a context manager.
 
 ## Binary Resolution
 
-The Python binding looks for the `lightpanda` binary in this order:
+The Python binding looks for the `chameleon` binary in this order:
 
 1. `binary_path` argument passed to constructor
 2. `CHAMELEON_BIN` environment variable
-3. `lightpanda` on system `PATH`
+3. `chameleon` on system `PATH`
 4. `./zig-out/bin/chameleon` (development build)
 5. Bundled binary in the package (if installed with binary distribution)
 
