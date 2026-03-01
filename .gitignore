@@ -10,4 +10,4 @@ lightpanda.id
 /src/html5ever/target/
 src/snapshot.bin
 .artifacts
-.env
+.env__pycache__/
