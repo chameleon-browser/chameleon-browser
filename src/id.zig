@@ -17,7 +17,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
-const lp = @import("lightpanda");
+const lp = @import("chameleon");
 
 // Generates incrementing prefixed integers, i.e. CTX-1, CTX-2, CTX-3.
 // Wraps to 0 on overflow.

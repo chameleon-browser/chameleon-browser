@@ -87,11 +87,13 @@ pub fn setHash(_: *const Location, hash: []const u8, page: *Page) !void {
 }
 
 pub fn assign(_: *const Location, url: [:0]const u8, page: *Page) !void {
-    return page.scheduleNavigation(url, .{ .reason = .script, .kind = .{ .push = null } }, .script);
+    const is_same_url = std.mem.eql(u8, page.url, url);
+    return page.scheduleNavigation(url, .{ .reason = .script, .kind = .{ .push = null }, .force = is_same_url }, .script);
 }
 
 pub fn replace(_: *const Location, url: [:0]const u8, page: *Page) !void {
-    return page.scheduleNavigation(url, .{ .reason = .script, .kind = .{ .replace = null } }, .script);
+    const is_same_url = std.mem.eql(u8, page.url, url);
+    return page.scheduleNavigation(url, .{ .reason = .script, .kind = .{ .replace = null }, .force = is_same_url }, .script);
 }
 
 pub fn reload(_: *const Location, page: *Page) !void {

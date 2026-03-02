@@ -17,7 +17,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
-const lp = @import("lightpanda");
+const lp = @import("chameleon");
 
 const log = @import("../../log.zig");
 const String = @import("../../string.zig").String;

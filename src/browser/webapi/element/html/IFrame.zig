@@ -198,7 +198,7 @@ pub const ContentWindow = struct {
         return &self._chrome;
     }
 
-    pub fn setTimeout(self: *ContentWindow, cb: js.Function.Temp, delay_ms: ?u32, params: []js.Value.Temp, page: *Page) !u32 {
+    pub fn setTimeout(self: *ContentWindow, cb: js.Value, delay_ms: ?u32, params: []js.Value.Temp, page: *Page) !u32 {
         return self._window.setTimeout(cb, delay_ms, params, page);
     }
 
@@ -206,7 +206,7 @@ pub const ContentWindow = struct {
         return self._window.clearTimeout(id);
     }
 
-    pub fn setInterval(self: *ContentWindow, cb: js.Function.Temp, delay_ms: ?u32, params: []js.Value.Temp, page: *Page) !u32 {
+    pub fn setInterval(self: *ContentWindow, cb: js.Value, delay_ms: ?u32, params: []js.Value.Temp, page: *Page) !u32 {
         return self._window.setInterval(cb, delay_ms, params, page);
     }
 

@@ -49,7 +49,7 @@ pub fn build(b: *Build) !void {
             .sanitize_c = enable_csan,
             .sanitize_thread = enable_tsan,
         });
-        mod.addImport("lightpanda", mod); // allow circular "lightpanda" import
+        mod.addImport("chameleon", mod); // allow circular "chameleon" import
 
         try addDependencies(b, mod, opts, enable_asan, enable_tsan, prebuilt_v8_path);
 

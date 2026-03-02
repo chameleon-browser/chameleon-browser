@@ -38,18 +38,22 @@ pub fn trace(_: *const Console, values: []js.Value, page: *Page) !void {
 
 pub fn debug(_: *const Console, values: []js.Value, page: *Page) void {
     logger.debug(.js, "console.debug", .{ValueWriter{ .page = page, .values = values }});
+    emitConsoleAPI("debug", values, page);
 }
 
 pub fn info(_: *const Console, values: []js.Value, page: *Page) void {
     logger.info(.js, "console.info", .{ValueWriter{ .page = page, .values = values }});
+    emitConsoleAPI("info", values, page);
 }
 
 pub fn log(_: *const Console, values: []js.Value, page: *Page) void {
     logger.info(.js, "console.log", .{ValueWriter{ .page = page, .values = values }});
+    emitConsoleAPI("log", values, page);
 }
 
 pub fn warn(_: *const Console, values: []js.Value, page: *Page) void {
     logger.warn(.js, "console.warn", .{ValueWriter{ .page = page, .values = values }});
+    emitConsoleAPI("warning", values, page);
 }
 
 pub fn clear(_: *const Console) void {}
@@ -63,6 +67,7 @@ pub fn assert(_: *const Console, assertion: js.Value, values: []js.Value, page: 
 
 pub fn @"error"(_: *const Console, values: []js.Value, page: *Page) void {
     logger.warn(.js, "console.error", .{ValueWriter{ .page = page, .values = values, .include_stack = true }});
+    emitConsoleAPI("error", values, page);
 }
 
 pub fn table(_: *const Console, data: js.Value, columns: ?js.Value) void {
@@ -130,6 +135,19 @@ pub fn timeEnd(self: *Console, label_: ?[]const u8) void {
 
 fn timestamp() u64 {
     return @import("../../datetime.zig").timestamp(.monotonic);
+}
+
+/// Emit a console API call notification to the CDP layer.
+/// This bridges Zig's custom console → CDP Runtime.consoleAPICalled events.
+/// Playwright relies on console.debug() as a signaling mechanism in set_content.
+fn emitConsoleAPI(call_type: []const u8, values: []js.Value, page: *Page) void {
+    // Extract the first argument as text for the CDP event.
+    // Most Playwright signals use a single string argument.
+    var text: []const u8 = "";
+    if (values.len > 0) {
+        text = values[0].toStringSlice() catch "";
+    }
+    page.consoleAPICall(call_type, text);
 }
 
 const ValueWriter = struct {

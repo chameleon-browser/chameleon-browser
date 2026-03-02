@@ -17,7 +17,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
-const lp = @import("lightpanda");
+const lp = @import("chameleon");
 
 const log = @import("log.zig");
 const Page = @import("browser/Page.zig");
@@ -71,8 +71,10 @@ const EventListeners = struct {
     page_created: List = .{},
     page_navigate: List = .{},
     page_navigated: List = .{},
+    page_document_complete: List = .{},
     page_network_idle: List = .{},
     page_network_almost_idle: List = .{},
+    console_api: List = .{},
     http_request_fail: List = .{},
     http_request_start: List = .{},
     http_request_intercept: List = .{},
@@ -87,8 +89,10 @@ const Events = union(enum) {
     page_created: *Page,
     page_navigate: *const PageNavigate,
     page_navigated: *const PageNavigated,
+    page_document_complete: *const PageDocumentComplete,
     page_network_idle: *const PageNetworkIdle,
     page_network_almost_idle: *const PageNetworkAlmostIdle,
+    console_api: *const ConsoleAPI,
     http_request_fail: *const RequestFail,
     http_request_start: *const RequestStart,
     http_request_intercept: *const RequestIntercept,
@@ -113,6 +117,16 @@ pub const PageNavigated = struct {
     timestamp: u64,
     url: [:0]const u8,
     opts: Page.NavigatedOpts,
+};
+
+pub const PageDocumentComplete = struct {
+    timestamp: u64,
+};
+
+pub const ConsoleAPI = struct {
+    call_type: []const u8,
+    text: []const u8,
+    timestamp: u64,
 };
 
 pub const PageNetworkIdle = struct {

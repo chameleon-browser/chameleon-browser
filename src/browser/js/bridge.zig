@@ -18,7 +18,7 @@
 
 const std = @import("std");
 const js = @import("js.zig");
-const lp = @import("lightpanda");
+const lp = @import("chameleon");
 const log = @import("../../log.zig");
 const Page = @import("../Page.zig");
 

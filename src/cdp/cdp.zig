@@ -17,7 +17,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
-const lp = @import("lightpanda");
+const lp = @import("chameleon");
 
 const Allocator = std.mem.Allocator;
 const json = std.json;
@@ -38,6 +38,20 @@ pub const URL_BASE = "chrome://newtab/";
 pub const LOADER_ID = "LOADERID24DD2FD56CF1EF33C965C79C";
 
 const IS_DEBUG = @import("builtin").mode == .Debug;
+
+// Types for Runtime.consoleAPICalled CDP event
+const ConsoleAPIArg = struct {
+    type: []const u8,
+    value: []const u8,
+};
+
+const ConsoleAPICallFrame = struct {
+    functionName: []const u8 = "",
+    scriptId: []const u8 = "",
+    url: []const u8 = "",
+    lineNumber: i32 = 0,
+    columnNumber: i32 = 0,
+};
 
 pub const CDP = CDPT(struct {
     const Client = *@import("../Server.zig").Client;
@@ -439,6 +453,8 @@ pub fn BrowserContext(comptime CDP_T: type) type {
             try notification.register(.page_created, self, onPageCreated);
             try notification.register(.page_navigate, self, onPageNavigate);
             try notification.register(.page_navigated, self, onPageNavigated);
+            try notification.register(.page_document_complete, self, onPageDocumentComplete);
+            try notification.register(.console_api, self, onConsoleAPI);
         }
 
         pub fn deinit(self: *Self) void {
@@ -618,6 +634,30 @@ pub fn BrowserContext(comptime CDP_T: type) type {
             const self: *Self = @ptrCast(@alignCast(ctx));
             defer self.resetNotificationArena();
             return @import("domains/page.zig").pageNavigated(self.notification_arena, self, msg);
+        }
+
+        pub fn onPageDocumentComplete(ctx: *anyopaque, msg: *const Notification.PageDocumentComplete) !void {
+            const self: *Self = @ptrCast(@alignCast(ctx));
+            defer self.resetNotificationArena();
+            return @import("domains/page.zig").pageDocumentComplete(self, msg);
+        }
+
+        pub fn onConsoleAPI(ctx: *anyopaque, msg: *const Notification.ConsoleAPI) !void {
+            const self: *Self = @ptrCast(@alignCast(ctx));
+            defer self.resetNotificationArena();
+            const session_id = self.session_id orelse return;
+            var cdp = self.cdp;
+
+            // Emit Runtime.consoleAPICalled CDP event
+            try cdp.sendEvent("Runtime.consoleAPICalled", .{
+                .type = msg.call_type,
+                .args = &[_]ConsoleAPIArg{
+                    .{ .type = "string", .value = msg.text },
+                },
+                .executionContextId = 1,
+                .timestamp = msg.timestamp,
+                .stackTrace = .{ .callFrames = &[0]ConsoleAPICallFrame{} },
+            }, .{ .session_id = session_id });
         }
 
         pub fn onPageNetworkIdle(ctx: *anyopaque, msg: *const Notification.PageNetworkIdle) !void {

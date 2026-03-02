@@ -24,7 +24,7 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
-const lp = @import("lightpanda");
+const lp = @import("chameleon");
 
 const log = lp.log;
 
