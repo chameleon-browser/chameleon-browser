@@ -21,6 +21,8 @@ const Page = @import("../../../Page.zig");
 const Window = @import("../../Window.zig");
 const VisualViewport = @import("../../VisualViewport.zig");
 const Document = @import("../../Document.zig");
+const HTMLDocument = @import("../../HTMLDocument.zig");
+const DocumentType = @import("../../DocumentType.zig");
 const Location = @import("../../Location.zig");
 const Navigator = @import("../../Navigator.zig");
 const Chrome = @import("../../Chrome.zig");
@@ -61,6 +63,11 @@ pub fn getContentWindow(self: *IFrame, page: *Page) !*ContentWindow {
     return content_window;
 }
 
+pub fn getContentDocument(self: *IFrame, page: *Page) !*Document {
+    const cw = try self.getContentWindow(page);
+    return cw.getOrCreateDocument(page);
+}
+
 pub fn getSrcdoc(self: *const IFrame) ?[]const u8 {
     return self.asConstElement().getAttributeSafe(comptime .wrap("srcdoc"));
 }
@@ -79,6 +86,7 @@ pub const JsApi = struct {
     };
 
     pub const contentWindow = bridge.accessor(IFrame.getContentWindow, null, .{});
+    pub const contentDocument = bridge.accessor(IFrame.getContentDocument, null, .{});
     pub const srcdoc = bridge.accessor(IFrame.getSrcdoc, IFrame.setSrcdoc, .{});
 };
 
@@ -86,6 +94,7 @@ pub const ContentWindow = struct {
     _proto: *EventTarget,
     _window: *Window,
     _frame_element: *IFrame,
+    _content_document: ?*Document = null,
     _navigator: Navigator = .init,
     _chrome: Chrome = .init,
 
@@ -109,8 +118,46 @@ pub const ContentWindow = struct {
         return self._window;
     }
 
-    pub fn getDocument(self: *ContentWindow) *Document {
-        return self._window.getDocument();
+    pub fn getDocument(self: *ContentWindow, page: *Page) !*Document {
+        return self.getOrCreateDocument(page);
+    }
+
+    /// Lazily create the iframe's inner Document (about:blank).
+    /// Follows the same pattern as DOMImplementation.createHTMLDocument.
+    pub fn getOrCreateDocument(self: *ContentWindow, page: *Page) !*Document {
+        if (self._content_document) |doc| {
+            return doc;
+        }
+
+        // Create a standalone HTMLDocument for this iframe's browsing context.
+        const html_doc = try page._factory.document(HTMLDocument{
+            ._proto = undefined,
+        });
+        const document = html_doc.asDocument();
+        document._ready_state = .complete;
+
+        // Build the minimal document structure: <!DOCTYPE html><html><head></head><body></body></html>
+        {
+            const doctype = try page._factory.node(DocumentType{
+                ._proto = undefined,
+                ._name = "html",
+                ._public_id = "",
+                ._system_id = "",
+            });
+            _ = try document.asNode().appendChild(doctype.asNode(), page);
+        }
+
+        const html_node = try page.createElementNS(.html, "html", null);
+        _ = try document.asNode().appendChild(html_node, page);
+
+        const head_node = try page.createElementNS(.html, "head", null);
+        _ = try html_node.appendChild(head_node, page);
+
+        const body_node = try page.createElementNS(.html, "body", null);
+        _ = try html_node.appendChild(body_node, page);
+
+        self._content_document = document;
+        return document;
     }
 
     pub fn getLocation(self: *ContentWindow) *Location {
