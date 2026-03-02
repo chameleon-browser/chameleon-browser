@@ -825,7 +825,27 @@ fn processMessages(self: *Client) !bool {
 
         defer transfer.deinit();
 
-        if (errorCheck(msg.data.result)) blk: {
+        var result_err = errorCheck(msg.data.result);
+
+        // HACK: Some WAFs (like Jiasule/CT2-WAAP) append garbage bytes after the valid
+        // chunked-encoding EOF ("0\r\n\r\n"), causing curl to return an error (WriteError or RecvError).
+        // Chrome tolerates this and processes the valid body.
+        // We simulate this tolerance by ignoring these errors if we've successfully
+        // received some body data and the header was parsed.
+        if (result_err) |_| {} else |err| {
+            if (transfer._header_done_called and transfer.bytes_received > 0) {
+                if (err == error.WriteError or err == error.PartialFile or err == error.RecvError) {
+                    log.warn(.http, "tolerating transfer err", .{
+                        .url = transfer.url,
+                        .bytes = transfer.bytes_received,
+                        .err = err,
+                    });
+                    result_err = {}; // clear the error
+                }
+            }
+        }
+
+        if (result_err) |_| blk: {
             // In case of request w/o data, we need to call the header done
             // callback now.
             if (!transfer._header_done_called) {
@@ -1388,9 +1408,7 @@ pub const Transfer = struct {
         if (std.mem.startsWith(u8, header, "HTTP/")) {
             // Is it the first header line.
             if (buf_len < 13) {
-                if (comptime IS_DEBUG) {
-                    log.debug(.http, "invalid response line", .{ .line = header });
-                }
+                log.err(.http, "invalid response line", .{ .line = header });
                 return 0;
             }
             const version_start: usize = if (header[5] == '2') 7 else 9;
@@ -1403,9 +1421,7 @@ pub const Transfer = struct {
             }
 
             const status = std.fmt.parseInt(u16, header[version_start..version_end], 10) catch {
-                if (comptime IS_DEBUG) {
-                    log.debug(.http, "invalid status code", .{ .line = header });
-                }
+                log.err(.http, "invalid status code", .{ .line = header });
                 return 0;
             };
 
@@ -1462,9 +1478,7 @@ pub const Transfer = struct {
         if (transfer._redirecting) {
             // parse and set cookies for the redirection.
             redirectionCookies(transfer, easy) catch |err| {
-                if (comptime IS_DEBUG) {
-                    log.debug(.http, "redirection cookies", .{ .err = err });
-                }
+                log.err(.http, "redirection cookies", .{ .err = err });
                 return 0;
             };
             return buf_len;
