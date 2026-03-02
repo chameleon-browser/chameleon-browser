@@ -1,5 +1,5 @@
 const std = @import("std");
-const lp = @import("lightpanda");
+const lp = @import("chameleon");
 
 const Allocator = std.mem.Allocator;
 

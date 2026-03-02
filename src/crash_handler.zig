@@ -1,5 +1,5 @@
 const std = @import("std");
-const lp = @import("lightpanda");
+const lp = @import("chameleon");
 const builtin = @import("builtin");
 
 const IS_DEBUG = builtin.mode == .Debug;

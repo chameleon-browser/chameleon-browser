@@ -728,6 +728,10 @@ pub fn open(self: *Document, page: *Page) !*Document {
     self._script_created_parser = Parser.Streaming.init(page.arena, doc_node, page);
     try self._script_created_parser.?.start();
     page._parse_mode = .document;
+    // Reset load state so that document.close() → documentIsComplete() will
+    // dispatch lifecycle events again (needed for Playwright's set_content).
+    // We set to .load (not .parsing) to skip documentIsLoaded() call.
+    page._load_state = .load;
 
     return self;
 }

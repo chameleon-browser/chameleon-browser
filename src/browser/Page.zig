@@ -18,7 +18,7 @@
 
 const std = @import("std");
 const JS = @import("js/js.zig");
-const lp = @import("lightpanda");
+const lp = @import("chameleon");
 const builtin = @import("builtin");
 
 const Allocator = std.mem.Allocator;
@@ -699,19 +699,46 @@ pub fn documentIsComplete(self: *Page) void {
     }
 
     self._load_state = .complete;
+
+    // Guard: if _req_id is null, this page was never navigated (e.g. about:blank
+    // with document.write/close). Skip the internal event dispatch which may
+    // access stale DOM state, and instead notify the CDP layer directly.
+    if (self._req_id == null or self._navigated_options == null) {
+        self.document._ready_state = .complete;
+        self._session.notification.dispatch(.page_document_complete, &.{
+            .timestamp = timestamp(.monotonic),
+        });
+        return;
+    }
+
     self._documentIsComplete() catch |err| {
         log.err(.page, "document is complete", .{ .err = err });
     };
-
-    if (IS_DEBUG) {
-        std.debug.assert(self._req_id != null);
-        std.debug.assert(self._navigated_options != null);
-    }
 
     self._session.notification.dispatch(.page_navigated, &.{
         .req_id = self._req_id.?,
         .opts = self._navigated_options.?,
         .url = self.url,
+        .timestamp = timestamp(.monotonic),
+    });
+}
+
+/// Mark the page as complete without dispatching page_navigated.
+/// Used for about:blank targets that skip navigation entirely.
+/// The _load_state is set to .complete so that setLifecycleEventsEnabled
+/// can retroactively fire the DOMContentLoaded/load lifecycle events.
+pub fn markComplete(self: *Page) void {
+    self._load_state = .complete;
+}
+
+/// Notify the CDP layer about a console API call so it can emit
+/// Runtime.consoleAPICalled events. This is needed because our
+/// console implementation is custom Zig code and doesn't go through
+/// V8's built-in console (which would trigger inspector events).
+pub fn consoleAPICall(self: *Page, call_type: []const u8, text: []const u8) void {
+    self._session.notification.dispatch(.console_api, &.{
+        .call_type = call_type,
+        .text = text,
         .timestamp = timestamp(.monotonic),
     });
 }

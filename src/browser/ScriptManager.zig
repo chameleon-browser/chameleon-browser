@@ -17,7 +17,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
-const lp = @import("lightpanda");
+const lp = @import("chameleon");
 const builtin = @import("builtin");
 
 const js = @import("js/js.zig");

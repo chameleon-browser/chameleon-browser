@@ -17,7 +17,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
-const lp = @import("lightpanda");
+const lp = @import("chameleon");
 
 const log = @import("../../log.zig");
 const js = @import("../../browser/js/js.zig");
@@ -35,6 +35,7 @@ pub fn processMessage(cmd: anytype) !void {
         addScriptToEvaluateOnNewDocument,
         createIsolatedWorld,
         navigate,
+        setDocumentContent,
         stopLoading,
         close,
     }, cmd.input.action) orelse return error.UnknownMethod;
@@ -46,6 +47,7 @@ pub fn processMessage(cmd: anytype) !void {
         .addScriptToEvaluateOnNewDocument => return addScriptToEvaluateOnNewDocument(cmd),
         .createIsolatedWorld => return createIsolatedWorld(cmd),
         .navigate => return navigate(cmd),
+        .setDocumentContent => return setDocumentContent(cmd),
         .stopLoading => return cmd.sendResult(null, .{}),
         .close => return close(cmd),
     }
@@ -121,6 +123,56 @@ fn setLifecycleEventsEnabled(cmd: anytype) !void {
     return cmd.sendResult(null, .{});
 }
 
+/// Handle document.write/close completing on a page that was never navigated
+/// (e.g. about:blank pages). This is triggered by the page_document_complete
+/// notification from Page.documentIsComplete() when _req_id is null.
+pub fn pageDocumentComplete(bc: anytype, event: *const Notification.PageDocumentComplete) !void {
+    const session_id = bc.session_id orelse return;
+    const target_id = bc.target_id orelse return;
+    const loader_id = bc.loader_id;
+    var cdp = bc.cdp;
+    const now = event.timestamp;
+
+    // DOMContentLoaded lifecycle
+    if (bc.page_life_cycle_events) {
+        try cdp.sendEvent("Page.lifecycleEvent", LifecycleEvent{
+            .timestamp = now,
+            .name = "DOMContentLoaded",
+            .frameId = target_id,
+            .loaderId = loader_id,
+        }, .{ .session_id = session_id });
+    }
+
+    // domContentEventFired
+    try cdp.sendEvent(
+        "Page.domContentEventFired",
+        .{ .timestamp = @as(f64, @floatFromInt(now)) },
+        .{ .session_id = session_id },
+    );
+
+    // loadEventFired
+    try cdp.sendEvent(
+        "Page.loadEventFired",
+        .{ .timestamp = @as(f64, @floatFromInt(now)) },
+        .{ .session_id = session_id },
+    );
+
+    // load lifecycle
+    if (bc.page_life_cycle_events) {
+        try cdp.sendEvent("Page.lifecycleEvent", LifecycleEvent{
+            .timestamp = now,
+            .name = "load",
+            .frameId = target_id,
+            .loaderId = loader_id,
+        }, .{ .session_id = session_id });
+    }
+
+    // frameStoppedLoading
+    try cdp.sendEvent("Page.frameStoppedLoading", .{
+        .frameId = target_id,
+    }, .{ .session_id = session_id });
+}
+
 // TODO: hard coded method
 // With the command we receive a script we need to store and run for each new document.
 // Note that the worldName refers to the name given to the isolated world.
@@ -191,6 +243,26 @@ fn createIsolatedWorld(cmd: anytype) !void {
     const page = bc.session.currentPage() orelse return error.PageNotLoaded;
 
     const js_context = try world.createContext(page);
+
+    // Notify the inspector about the new context so that it sends
+    // Runtime.executionContextCreated event. Without this, Playwright
+    // will hang waiting for the utility context to appear.
+    {
+        var ls: @import("../../browser/js/js.zig").Local.Scope = undefined;
+        js_context.localScope(&ls);
+        defer ls.deinit();
+
+        const target_id = bc.target_id orelse return error.TargetNotLoaded;
+        const aux_json = try std.fmt.allocPrint(cmd.arena, "{{\"isDefault\":false,\"type\":\"isolated\",\"frameId\":\"{s}\"}}", .{target_id});
+        bc.inspector_session.inspector.contextCreated(
+            &ls.local,
+            params.worldName,
+            "://",
+            aux_json,
+            false,
+        );
+    }
+
     return cmd.sendResult(.{ .executionContextId = js_context.id }, .{});
 }
 
@@ -220,6 +292,45 @@ fn navigate(cmd: anytype) !void {
         .cdp_id = cmd.input.id,
         .kind = .{ .push = null },
     });
+}
+
+/// Page.setDocumentContent: sets the given HTML as the document content.
+/// This is used by Playwright's page.set_content() method.
+/// We fire lifecycle events so Playwright's waitUntil:"load" resolves.
+fn setDocumentContent(cmd: anytype) !void {
+    _ = (try cmd.params(struct {
+        frameId: []const u8,
+        html: []const u8,
+    })) orelse return error.InvalidParams;
+
+    const bc = cmd.browser_context orelse return error.BrowserContextNotLoaded;
+    const session_id = bc.session_id orelse return error.SessionIdNotLoaded;
+    const target_id = bc.target_id orelse return error.TargetNotLoaded;
+
+    // Send success result first
+    try cmd.sendResult(null, .{});
+
+    // Now fire the lifecycle events that Playwright expects.
+    // This mimics what pageNavigated() does, but without a full navigation.
+    const now = timestampF(.monotonic);
+    const loader_id = bc.loader_id;
+    var cdp = bc.cdp;
+
+    if (bc.page_life_cycle_events) {
+        try cdp.sendEvent("Page.lifecycleEvent", LifecycleEvent{
+            .timestamp = now,
+            .name = "DOMContentLoaded",
+            .frameId = target_id,
+            .loaderId = loader_id,
+        }, .{ .session_id = session_id });
+
+        try cdp.sendEvent("Page.lifecycleEvent", LifecycleEvent{
+            .timestamp = now,
+            .name = "load",
+            .frameId = target_id,
+            .loaderId = loader_id,
+        }, .{ .session_id = session_id });
+    }
 }
 
 pub fn pageNavigate(arena: Allocator, bc: anytype, event: *const Notification.PageNavigate) !void {

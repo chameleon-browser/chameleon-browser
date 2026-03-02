@@ -236,8 +236,8 @@ pub fn fetch(_: *const Window, input: Fetch.Input, options: ?Fetch.InitOpts, pag
     return Fetch.init(input, options, page);
 }
 
-pub fn setTimeout(self: *Window, cb: js.Function.Temp, delay_ms: ?u32, params: []js.Value.Temp, page: *Page) !u32 {
-    return self.scheduleCallback(cb, delay_ms orelse 0, .{
+pub fn setTimeout(self: *Window, cb: js.Value, delay_ms: ?u32, params: []js.Value.Temp, page: *Page) !u32 {
+    return self.scheduleTimerCallback(cb, delay_ms orelse 0, .{
         .repeat = false,
         .params = params,
         .low_priority = false,
@@ -245,8 +245,8 @@ pub fn setTimeout(self: *Window, cb: js.Function.Temp, delay_ms: ?u32, params: [
     }, page);
 }
 
-pub fn setInterval(self: *Window, cb: js.Function.Temp, delay_ms: ?u32, params: []js.Value.Temp, page: *Page) !u32 {
-    return self.scheduleCallback(cb, delay_ms orelse 0, .{
+pub fn setInterval(self: *Window, cb: js.Value, delay_ms: ?u32, params: []js.Value.Temp, page: *Page) !u32 {
+    return self.scheduleTimerCallback(cb, delay_ms orelse 0, .{
         .repeat = true,
         .params = params,
         .low_priority = false,
@@ -255,7 +255,7 @@ pub fn setInterval(self: *Window, cb: js.Function.Temp, delay_ms: ?u32, params: 
 }
 
 pub fn setImmediate(self: *Window, cb: js.Function.Temp, params: []js.Value.Temp, page: *Page) !u32 {
-    return self.scheduleCallback(cb, 0, .{
+    return self.scheduleCallback(cb, null, 0, .{
         .repeat = false,
         .params = params,
         .low_priority = false,
@@ -264,7 +264,7 @@ pub fn setImmediate(self: *Window, cb: js.Function.Temp, params: []js.Value.Temp
 }
 
 pub fn requestAnimationFrame(self: *Window, cb: js.Function.Temp, page: *Page) !u32 {
-    return self.scheduleCallback(cb, 5, .{
+    return self.scheduleCallback(cb, null, 5, .{
         .repeat = false,
         .params = &.{},
         .low_priority = false,
@@ -302,7 +302,7 @@ const RequestIdleCallbackOpts = struct {
 };
 pub fn requestIdleCallback(self: *Window, cb: js.Function.Temp, opts_: ?RequestIdleCallbackOpts, page: *Page) !u32 {
     const opts = opts_ orelse RequestIdleCallbackOpts{};
-    return self.scheduleCallback(cb, opts.timeout orelse 50, .{
+    return self.scheduleCallback(cb, null, opts.timeout orelse 50, .{
         .mode = .idle,
         .repeat = false,
         .params = &.{},
@@ -557,7 +557,26 @@ const ScheduleOpts = struct {
     animation_frame: bool = false,
     mode: ScheduleCallback.Mode = .normal,
 };
-fn scheduleCallback(self: *Window, cb: js.Function.Temp, delay_ms: u32, opts: ScheduleOpts, page: *Page) !u32 {
+
+/// Handles the first argument of setTimeout/setInterval which can be
+/// either a function (normal case) or a string (to be eval'd per spec).
+fn scheduleTimerCallback(self: *Window, cb: js.Value, delay_ms: u32, opts: ScheduleOpts, page: *Page) !u32 {
+    if (cb.isFunction()) {
+        // Normal case: first argument is a function.
+        const js_func = js.Function{ .local = cb.local, .handle = @ptrCast(cb.handle) };
+        const temp_func = try js_func.temp();
+        return self.scheduleCallback(temp_func, null, delay_ms, opts, page);
+    }
+
+    // Per HTML spec, if the first argument is not a function, it is
+    // converted to a string and evaluated as a script when the timer fires.
+    const code = cb.toStringSliceWithAlloc(page.arena) catch {
+        return error.InvalidArgument;
+    };
+    return self.scheduleCallback(null, code, delay_ms, opts, page);
+}
+
+fn scheduleCallback(self: *Window, cb: ?js.Function.Temp, eval_code: ?[]const u8, delay_ms: u32, opts: ScheduleOpts, page: *Page) !u32 {
     if (self._timers.count() > 512) {
         // these are active
         return error.TooManyTimeout;
@@ -582,9 +601,12 @@ fn scheduleCallback(self: *Window, cb: js.Function.Temp, delay_ms: u32, opts: Sc
     }
     errdefer _ = self._timers.remove(timer_id);
 
+    const eval_code_owned = if (eval_code) |code| try arena.dupe(u8, code) else null;
+
     const callback = try arena.create(ScheduleCallback);
     callback.* = .{
         .cb = cb,
+        .eval_code = eval_code_owned,
         .page = page,
         .arena = arena,
         .mode = opts.mode,
@@ -614,7 +636,12 @@ const ScheduleCallback = struct {
     // delay, in ms, to repeat. When null, will be removed after the first time
     repeat_ms: ?u32,
 
-    cb: js.Function.Temp,
+    // Either cb or eval_code is set — never both.
+    // cb is set when the first argument was a function.
+    cb: ?js.Function.Temp,
+    // eval_code is set when the first argument was a string (per HTML spec,
+    // setTimeout/setInterval accept a string which is eval'd on fire).
+    eval_code: ?[]const u8,
 
     mode: Mode,
     page: *Page,
@@ -634,7 +661,9 @@ const ScheduleCallback = struct {
     }
 
     fn deinit(self: *ScheduleCallback) void {
-        self.page.js.release(self.cb);
+        if (self.cb) |cb| {
+            self.page.js.release(cb);
+        }
         for (self.params) |param| {
             self.page.js.release(param);
         }
@@ -656,23 +685,30 @@ const ScheduleCallback = struct {
         page.js.localScope(&ls);
         defer ls.deinit();
 
-        switch (self.mode) {
-            .idle => {
-                const IdleDeadline = @import("IdleDeadline.zig");
-                ls.toLocal(self.cb).call(void, .{IdleDeadline{}}) catch |err| {
-                    log.warn(.js, "window.idleCallback", .{ .name = self.name, .err = err });
-                };
-            },
-            .animation_frame => {
-                ls.toLocal(self.cb).call(void, .{window._performance.now()}) catch |err| {
-                    log.warn(.js, "window.RAF", .{ .name = self.name, .err = err });
-                };
-            },
-            .normal => {
-                ls.toLocal(self.cb).call(void, self.params) catch |err| {
-                    log.warn(.js, "window.timer", .{ .name = self.name, .err = err });
-                };
-            },
+        if (self.eval_code) |code| {
+            // String argument: evaluate via eval (per HTML spec).
+            ls.local.eval(code, self.name) catch |err| {
+                log.warn(.js, "window.timer eval", .{ .name = self.name, .err = err });
+            };
+        } else if (self.cb) |_| {
+            switch (self.mode) {
+                .idle => {
+                    const IdleDeadline = @import("IdleDeadline.zig");
+                    ls.toLocal(self.cb.?).call(void, .{IdleDeadline{}}) catch |err| {
+                        log.warn(.js, "window.idleCallback", .{ .name = self.name, .err = err });
+                    };
+                },
+                .animation_frame => {
+                    ls.toLocal(self.cb.?).call(void, .{window._performance.now()}) catch |err| {
+                        log.warn(.js, "window.RAF", .{ .name = self.name, .err = err });
+                    };
+                },
+                .normal => {
+                    ls.toLocal(self.cb.?).call(void, self.params) catch |err| {
+                        log.warn(.js, "window.timer", .{ .name = self.name, .err = err });
+                    };
+                },
+            }
         }
         ls.local.runMicrotasks();
         if (self.repeat_ms) |ms| {

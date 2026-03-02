@@ -17,7 +17,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
-const lp = @import("lightpanda");
+const lp = @import("chameleon");
 const log = @import("../../log.zig");
 const js = @import("../../browser/js/js.zig");
 
@@ -28,6 +28,7 @@ pub fn processMessage(cmd: anytype) !void {
     const action = std.meta.stringToEnum(enum {
         getTargets,
         attachToTarget,
+        attachToBrowserTarget,
         closeTarget,
         createBrowserContext,
         createTarget,
@@ -44,6 +45,7 @@ pub fn processMessage(cmd: anytype) !void {
     switch (action) {
         .getTargets => return getTargets(cmd),
         .attachToTarget => return attachToTarget(cmd),
+        .attachToBrowserTarget => return cmd.sendResult(.{ .sessionId = "browser" }, .{}),
         .closeTarget => return closeTarget(cmd),
         .createBrowserContext => return createBrowserContext(cmd),
         .createTarget => return createTarget(cmd),
@@ -220,6 +222,11 @@ fn createTarget(cmd: anytype) !void {
             params.url,
             .{ .reason = .address_bar, .kind = .{ .push = null } },
         );
+    } else {
+        // about:blank pages skip navigation entirely. Mark the page as
+        // complete so that setLifecycleEventsEnabled can retroactively
+        // fire DOMContentLoaded/load lifecycle events.
+        page.markComplete();
     }
 
     try cmd.sendResult(.{

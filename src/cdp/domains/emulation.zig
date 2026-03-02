@@ -24,6 +24,14 @@ pub fn processMessage(cmd: anytype) !void {
         setFocusEmulationEnabled,
         setDeviceMetricsOverride,
         setTouchEmulationEnabled,
+        setGeolocationOverride,
+        setUserAgentOverride,
+        setLocaleOverride,
+        setTimezoneOverride,
+        setHardwareConcurrencyOverride,
+        setDefaultBackgroundColorOverride,
+        setAutomationOverride,
+        setScrollbarsHidden,
     }, cmd.input.action) orelse return error.UnknownMethod;
 
     switch (action) {
@@ -31,6 +39,14 @@ pub fn processMessage(cmd: anytype) !void {
         .setFocusEmulationEnabled => return setFocusEmulationEnabled(cmd),
         .setDeviceMetricsOverride => return setDeviceMetricsOverride(cmd),
         .setTouchEmulationEnabled => return setTouchEmulationEnabled(cmd),
+        .setGeolocationOverride => return cmd.sendResult(null, .{}),
+        .setUserAgentOverride => return cmd.sendResult(null, .{}),
+        .setLocaleOverride => return cmd.sendResult(null, .{}),
+        .setTimezoneOverride => return cmd.sendResult(null, .{}),
+        .setHardwareConcurrencyOverride => return cmd.sendResult(null, .{}),
+        .setDefaultBackgroundColorOverride => return cmd.sendResult(null, .{}),
+        .setAutomationOverride => return cmd.sendResult(null, .{}),
+        .setScrollbarsHidden => return cmd.sendResult(null, .{}),
     }
 }
 
