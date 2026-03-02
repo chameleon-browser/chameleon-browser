@@ -27,6 +27,14 @@ jobs:
     - name: Install build dependencies
       run: python -m pip install --upgrade pip build twine
 
+    - name: Install package with dev dependencies
+      working-directory: ./python
+      run: pip install -e ".[dev]"
+
+    - name: Run tests
+      working-directory: ./python
+      run: python -m pytest tests/ -v
+
     - name: Build package
       working-directory: ./python
       run: python -m build

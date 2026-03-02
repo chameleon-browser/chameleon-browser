@@ -121,3 +121,29 @@ data:
 install-submodule:
 	@git submodule init && \
 	git submodule update
+
+
+# Python package commands
+# -----------------------
+.PHONY: python-test python-build python-check python-lint
+
+PYTHON := python3
+PYTHON_DIR := python
+
+## Run Python package unit tests
+python-test:
+	@printf "\033[36mRunning Python tests...\033[0m\n"
+	@cd $(PYTHON_DIR) && $(PYTHON) -m pytest tests/ -v || (printf "\033[33mPython tests FAILED\033[0m\n"; exit 1;)
+	@printf "\033[33mPython tests OK\033[0m\n"
+
+## Build Python sdist and wheel
+python-build:
+	@printf "\033[36mBuilding Python package...\033[0m\n"
+	@cd $(PYTHON_DIR) && $(PYTHON) -m build || (printf "\033[33mPython build ERROR\033[0m\n"; exit 1;)
+	@printf "\033[33mPython build OK\033[0m\n"
+
+## Check Python package metadata with twine
+python-check: python-build
+	@printf "\033[36mChecking Python package...\033[0m\n"
+	@cd $(PYTHON_DIR) && twine check dist/* || (printf "\033[33mPython check ERROR\033[0m\n"; exit 1;)
+	@printf "\033[33mPython check OK\033[0m\n"

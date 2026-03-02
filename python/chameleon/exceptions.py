@@ -1,5 +1,7 @@
 """Exception classes for the Chameleon Python binding."""
 
+from typing import Optional
+
 
 class ChameleonError(Exception):
     """Base exception for all Chameleon errors."""
@@ -12,7 +14,7 @@ class BinaryNotFoundError(ChameleonError):
 class FetchError(ChameleonError):
     """Raised when a fetch operation fails."""
 
-    def __init__(self, message: str, returncode: int | None = None, stderr: str = ""):
+    def __init__(self, message: str, returncode: Optional[int] = None, stderr: str = ""):
         super().__init__(message)
         self.returncode = returncode
         self.stderr = stderr
