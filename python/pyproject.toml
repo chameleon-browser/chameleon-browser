@@ -7,7 +7,7 @@ name = "chameleon-browser"
 version = "0.1.0"
 description = "Python binding for Chameleon headless browser with enhanced fingerprint spoofing"
 readme = "README.md"
-license = {text = "AGPL-3.0"}
+license = "AGPL-3.0-only"
 requires-python = ">=3.8"
 authors = [
     {name = "kylin1020"},
@@ -24,7 +24,6 @@ keywords = [
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: GNU Affero General Public License v3",
     "Operating System :: POSIX :: Linux",
     "Operating System :: MacOS",
     "Programming Language :: Python :: 3",
