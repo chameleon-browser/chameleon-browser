@@ -12,16 +12,6 @@ on:
       - "src/**"
       - "vendor/**"
       - "Makefile"
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - ".github/workflows/**"
-      - ".github/actions/install/**"
-      - "build.zig"
-      - "build.zig.zon"
-      - "src/**"
-      - "vendor/**"
-      - "Makefile"
   workflow_dispatch:
     inputs:
       target:
@@ -39,7 +29,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
 
-    if: (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && (github.event_name != 'workflow_dispatch' || inputs.target == 'linux-x86_64')
+    if: github.event_name != 'workflow_dispatch' || inputs.target == 'linux-x86_64'
 
     steps:
       - uses: actions/checkout@v4
