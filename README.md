@@ -40,9 +40,9 @@ The easiest way to use Chameleon Browser is via our official Python binding, whi
 ### Installation
 
 ```bash
-# Only install the python packages. 
+# Only install the python package — playwright is included as a dependency automatically.
 # There is NO NEED to run `playwright install chromium` because Chameleon is its own browser engine!
-pip install chameleon-browser playwright
+pip install chameleon-browser
 ```
 
 ### Usage
@@ -56,8 +56,8 @@ browser = ChameleonBrowser(profile="chrome131-macos")
 # It automatically starts a CDP server on a random port and connects Playwright
 with browser.connect() as pw_browser:
     # pw_browser is a standard Playwright Browser instance!
-    context = pw_browser.contexts[0]
-    page = context.pages[0]
+    context = pw_browser.new_context()
+    page = context.new_page()
     
     # Navigate to a test page
     page.goto("https://bot.sannysoft.com")
@@ -75,8 +75,8 @@ from chameleon import AsyncChameleonBrowser
 async def main():
     browser = AsyncChameleonBrowser(profile="chrome131-macos")
     async with browser.connect() as pw_browser:
-        context = pw_browser.contexts[0]
-        page = context.pages[0]
+        context = await pw_browser.new_context()
+        page = await context.new_page()
         await page.goto("https://bot.sannysoft.com")
         
         # Extract the page title
