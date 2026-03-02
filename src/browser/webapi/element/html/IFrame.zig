@@ -194,6 +194,22 @@ pub const ContentWindow = struct {
 
     pub fn scrollTo(_: *ContentWindow, _: js.Value, _: ?js.Value, _: *Page) void {}
 
+    pub fn close(self: *const ContentWindow) void {
+        self._window.close();
+    }
+
+    pub fn focus(self: *const ContentWindow) void {
+        self._window.focus();
+    }
+
+    pub fn blur(self: *const ContentWindow) void {
+        self._window.blur();
+    }
+
+    pub fn rtcPeerConnection(self: *const ContentWindow, config: ?js.Value) void {
+        self._window.rtcPeerConnection(config);
+    }
+
     pub fn getNavigator(self: *ContentWindow) *Navigator {
         return &self._navigator;
     }
@@ -246,6 +262,10 @@ pub const ContentWindow = struct {
         pub const btoa = bridge.function(ContentWindow.btoa, .{});
         pub const atob = bridge.function(ContentWindow.atob, .{});
         pub const prompt = bridge.function(ContentWindow.prompt, .{});
+        pub const close = bridge.function(ContentWindow.close, .{});
+        pub const focus = bridge.function(ContentWindow.focus, .{});
+        pub const blur = bridge.function(ContentWindow.blur, .{});
+        pub const RTCPeerConnection = bridge.function(ContentWindow.rtcPeerConnection, .{});
         pub const scrollTo = bridge.function(ContentWindow.scrollTo, .{});
         pub const scroll = bridge.function(ContentWindow.scrollTo, .{});
 

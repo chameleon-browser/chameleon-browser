@@ -28,6 +28,10 @@
   testing.expectEqual($('#the_body').parentNode, document.documentElement);
 </script>
 
+<script id=scrollingElement>
+  testing.expectEqual($('#the_body'), document.scrollingElement);
+</script>
+
 <script id=title>
   testing.expectEqual('Test Document Title', document.title);
   document.title = 'New Title';
