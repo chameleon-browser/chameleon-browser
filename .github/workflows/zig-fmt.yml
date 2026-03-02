@@ -1,28 +1,21 @@
-name: zig-fmt
+name: pr-checks
 
 on:
   pull_request:
-
-    # By default GH trigger on types opened, synchronize and reopened.
-    # see https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#pull_request
-    # Since we skip the job when the PR is in draft state, we want to force CI
-    # running when the PR is marked ready_for_review w/o other change.
-    # see https://github.com/orgs/community/discussions/25722#discussioncomment-3248917
     types: [opened, synchronize, reopened, ready_for_review]
-
     paths:
       - ".github/**"
       - "build.zig"
-      - "src/**/*.zig"
-      - "src/*.zig"
-  # Allows you to run this workflow manually from the Actions tab
+      - "build.zig.zon"
+      - "src/**"
+      - "vendor/**"
+      - "Makefile"
   workflow_dispatch:
 
 jobs:
   zig-fmt:
     name: zig fmt
 
-    # Don't run the CI with draft PR.
     if: github.event.pull_request.draft == false
 
     runs-on: ubuntu-latest
@@ -58,3 +51,28 @@ jobs:
       - name: Fail the job
         if: steps.fmt.outputs.zig_fmt_errs != ''
         run: exit 1
+
+  compile-check:
+    name: compile check
+
+    if: github.event.pull_request.draft == false
+
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - uses: ./.github/actions/install
+        with:
+          os: linux
+          arch: x86_64
+
+      - name: Build snapshot
+        run: zig build -Dprebuilt_v8_path=v8/libc_v8.a -Doptimize=ReleaseFast snapshot_creator -- src/snapshot.bin
+
+      - name: Compile check
+        run: zig build -Dsnapshot_path=../../snapshot.bin -Dprebuilt_v8_path=v8/libc_v8.a -Doptimize=ReleaseFast -Dcpu=x86_64 -Dgit_commit=$(git rev-parse --short ${{ github.sha }})
