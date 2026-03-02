@@ -6,20 +6,36 @@ This repository contains the source code for **Chameleon Browser** (an enhanced 
 
 ---
 
-## 1. Branching & PR Strategy (DO NOT DEVELOP ON MAIN)
+## 1. Branching, Worktrees & PR Strategy (DO NOT DEVELOP ON MAIN)
 
 - **Never write code directly to the `main` branch.**
-- Before writing any code, you must create a new branch:
+- **CRITICAL: Use Git Worktrees for isolation.** To prevent multiple AI agents from modifying the same files and affecting each other, you must *always* create a git worktree from the `main` branch when starting a new task (feature or bugfix), and move to that worktree for development.
+- Before writing any code, create a new branch and worktree:
   ```bash
-  git checkout -b <type>/<short-description>
+  # Ensure main is up to date
+  git checkout main
+  git pull origin main
+  
+  # Create a worktree outside the main repository to avoid conflicts
+  # Replace <short-description> and <type> appropriately (e.g., type: feat, fix, docs)
+  git worktree add ../worktree-<short-description> -b <type>/<short-description> main
+  
+  # Move to the worktree to start developing
+  cd ../worktree-<short-description>
   ```
-  *(e.g., `feat/canvas-fingerprint`, `fix/tls-hash-mismatch`, `docs/update-readme`)*
+- Do all your development, building, and testing inside this newly created worktree directory.
 - When your work is complete, tested, and formatted:
-  1. Add and commit your changes (`git commit -m "feat: your message"`).
-  2. Push your branch to the remote (`git push origin <branch-name>`).
+  1. Add and commit your changes (`git commit -m "<type>: your message"`).
+  2. Push your branch to the remote (`git push -u origin <type>/<short-description>`).
   3. Create a Pull Request using the `gh` CLI:
      ```bash
-     gh pr create --title "feat: descriptive title" --body "Detailed explanation of changes."
+     gh pr create --title "<type>: descriptive title" --body "Detailed explanation of changes."
+     ```
+  4. Move back to the main repository and remove the worktree:
+     ```bash
+     cd /Users/jyxc-dz-0100286/lightpanda-browser
+     git worktree remove ../worktree-<short-description>
+     # Optionally delete the branch if merged: git branch -D <type>/<short-description>
      ```
 - Let the CI (GitHub Actions) run. Do not merge your own PR unless explicitly requested by the user.
 
