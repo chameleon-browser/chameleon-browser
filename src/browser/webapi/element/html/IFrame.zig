@@ -188,6 +188,10 @@ pub const ContentWindow = struct {
         return self._window.atob(input, page);
     }
 
+    pub fn prompt(self: *const ContentWindow, message: ?js.Value, default_value: ?js.Value) ?[]const u8 {
+        return self._window.prompt(message, default_value);
+    }
+
     pub fn scrollTo(_: *ContentWindow, _: js.Value, _: ?js.Value, _: *Page) void {}
 
     pub fn getNavigator(self: *ContentWindow) *Navigator {
@@ -241,6 +245,7 @@ pub const ContentWindow = struct {
         pub const clearInterval = bridge.function(ContentWindow.clearInterval, .{});
         pub const btoa = bridge.function(ContentWindow.btoa, .{});
         pub const atob = bridge.function(ContentWindow.atob, .{});
+        pub const prompt = bridge.function(ContentWindow.prompt, .{});
         pub const scrollTo = bridge.function(ContentWindow.scrollTo, .{});
         pub const scroll = bridge.function(ContentWindow.scrollTo, .{});
 

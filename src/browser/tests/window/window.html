@@ -77,6 +77,13 @@
   testing.expectEqual('The quick brown fox jumps over the lazy dog', atob('VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw=='));
 </script>
 
+<script id=prompt>
+  testing.expectEqual('function', typeof prompt);
+  testing.expectEqual(window.prompt, prompt);
+  testing.expectEqual(null, prompt());
+  testing.expectEqual(null, prompt('message', 'default value'));
+</script>
+
 <script id=btoa_atob_roundtrip>
   const testStrings = [
     'Hello World!',

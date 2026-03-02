@@ -420,6 +420,10 @@ pub fn atob(_: *const Window, input: []const u8, page: *Page) ![]const u8 {
     return decoded;
 }
 
+pub fn prompt(_: *const Window, _: ?js.Value, _: ?js.Value) ?[]const u8 {
+    return null;
+}
+
 pub fn getFrame(_: *Window, _: usize) !?*Window {
     // TODO return the iframe's window.
     return null;
@@ -822,6 +826,7 @@ pub const JsApi = struct {
     pub const postMessage = bridge.function(Window.postMessage, .{});
     pub const btoa = bridge.function(Window.btoa, .{});
     pub const atob = bridge.function(Window.atob, .{});
+    pub const prompt = bridge.function(Window.prompt, .{});
     pub const reportError = bridge.function(Window.reportError, .{});
     pub const getComputedStyle = bridge.function(Window.getComputedStyle, .{});
     pub const getSelection = bridge.function(Window.getSelection, .{});
