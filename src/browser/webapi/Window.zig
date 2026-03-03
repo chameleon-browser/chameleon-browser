@@ -187,6 +187,18 @@ pub fn focus(_: *const Window) void {}
 
 pub fn blur(_: *const Window) void {}
 
+/// No-op stubs for window positioning/sizing (headless browser has no real window)
+pub fn moveTo(_: *const Window, _: i32, _: i32) void {}
+pub fn moveBy(_: *const Window, _: i32, _: i32) void {}
+pub fn resizeTo(_: *const Window, _: i32, _: i32) void {}
+pub fn resizeBy(_: *const Window, _: i32, _: i32) void {}
+
+/// No-op: print dialog is not applicable in headless mode
+pub fn print(_: *const Window) void {}
+
+/// No-op: stop loading (headless has no visual loading to stop)
+pub fn stop(_: *const Window) void {}
+
 pub fn rtcPeerConnection(_: *const Window, _: ?js.Value) void {}
 
 pub fn setLocation(_: *const Window, url: [:0]const u8, page: *Page) !void {
@@ -856,6 +868,12 @@ pub const JsApi = struct {
     pub const close = bridge.function(Window.close, .{});
     pub const focus = bridge.function(Window.focus, .{});
     pub const blur = bridge.function(Window.blur, .{});
+    pub const moveTo = bridge.function(Window.moveTo, .{});
+    pub const moveBy = bridge.function(Window.moveBy, .{});
+    pub const resizeTo = bridge.function(Window.resizeTo, .{});
+    pub const resizeBy = bridge.function(Window.resizeBy, .{});
+    pub const print = bridge.function(Window.print, .{});
+    pub const stop = bridge.function(Window.stop, .{});
     pub const RTCPeerConnection = bridge.function(Window.rtcPeerConnection, .{});
     pub const frames = bridge.accessor(Window.getWindow, null, .{});
     pub const index = bridge.indexed(Window.getFrame, .{ .null_as_undefined = true });

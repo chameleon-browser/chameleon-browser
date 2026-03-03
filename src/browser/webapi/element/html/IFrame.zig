@@ -206,6 +206,30 @@ pub const ContentWindow = struct {
         self._window.blur();
     }
 
+    pub fn moveTo(self: *const ContentWindow, x: i32, y: i32) void {
+        self._window.moveTo(x, y);
+    }
+
+    pub fn moveBy(self: *const ContentWindow, x: i32, y: i32) void {
+        self._window.moveBy(x, y);
+    }
+
+    pub fn resizeTo(self: *const ContentWindow, w: i32, h: i32) void {
+        self._window.resizeTo(w, h);
+    }
+
+    pub fn resizeBy(self: *const ContentWindow, dw: i32, dh: i32) void {
+        self._window.resizeBy(dw, dh);
+    }
+
+    pub fn print(self: *const ContentWindow) void {
+        self._window.print();
+    }
+
+    pub fn stop(self: *const ContentWindow) void {
+        self._window.stop();
+    }
+
     pub fn rtcPeerConnection(self: *const ContentWindow, config: ?js.Value) void {
         self._window.rtcPeerConnection(config);
     }
@@ -265,6 +289,12 @@ pub const ContentWindow = struct {
         pub const close = bridge.function(ContentWindow.close, .{});
         pub const focus = bridge.function(ContentWindow.focus, .{});
         pub const blur = bridge.function(ContentWindow.blur, .{});
+        pub const moveTo = bridge.function(ContentWindow.moveTo, .{});
+        pub const moveBy = bridge.function(ContentWindow.moveBy, .{});
+        pub const resizeTo = bridge.function(ContentWindow.resizeTo, .{});
+        pub const resizeBy = bridge.function(ContentWindow.resizeBy, .{});
+        pub const print = bridge.function(ContentWindow.print, .{});
+        pub const stop = bridge.function(ContentWindow.stop, .{});
         pub const RTCPeerConnection = bridge.function(ContentWindow.rtcPeerConnection, .{});
         pub const scrollTo = bridge.function(ContentWindow.scrollTo, .{});
         pub const scroll = bridge.function(ContentWindow.scrollTo, .{});

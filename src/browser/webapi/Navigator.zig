@@ -92,6 +92,11 @@ pub fn getWebdriver(_: *const Navigator) ?bool {
     return null;
 }
 
+/// In Chrome, navigator.clientInformation === navigator (self-reference).
+pub fn getClientInformation(self: *Navigator) *Navigator {
+    return self;
+}
+
 pub fn getBattery(_: *const Navigator, page: *Page) !js.Promise {
     const BatteryStatus = struct {
         charging: bool,
@@ -219,6 +224,7 @@ pub const JsApi = struct {
     pub const deviceMemory = bridge.property(8.0, .{ .template = false });
     pub const productSub = bridge.property("20030107", .{ .template = false });
     pub const webdriver = bridge.property(false, .{ .template = false });
+    pub const clientInformation = bridge.accessor(Navigator.getClientInformation, null, .{});
     pub const registerProtocolHandler = bridge.function(Navigator.registerProtocolHandler, .{ .dom_exception = true });
     pub const unregisterProtocolHandler = bridge.function(Navigator.unregisterProtocolHandler, .{ .dom_exception = true });
     pub const sendBeacon = bridge.function(Navigator.sendBeacon, .{});
