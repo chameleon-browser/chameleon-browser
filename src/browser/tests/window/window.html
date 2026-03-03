@@ -77,6 +77,31 @@
   testing.expectEqual('The quick brown fox jumps over the lazy dog', atob('VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZw=='));
 </script>
 
+<script id=prompt>
+  testing.expectEqual('function', typeof prompt);
+  testing.expectEqual(window.prompt, prompt);
+  testing.expectEqual(null, prompt());
+  testing.expectEqual(null, prompt('message', 'default value'));
+</script>
+
+<script id=close>
+  testing.expectEqual('function', typeof close);
+  testing.expectEqual(window.close, close);
+  close();
+
+  testing.expectEqual('function', typeof focus);
+  testing.expectEqual(window.focus, focus);
+  focus();
+
+  testing.expectEqual('function', typeof blur);
+  testing.expectEqual(window.blur, blur);
+  blur();
+
+  testing.expectEqual('function', typeof RTCPeerConnection);
+  testing.expectEqual(window.RTCPeerConnection, RTCPeerConnection);
+  RTCPeerConnection({});
+</script>
+
 <script id=btoa_atob_roundtrip>
   const testStrings = [
     'Hello World!',

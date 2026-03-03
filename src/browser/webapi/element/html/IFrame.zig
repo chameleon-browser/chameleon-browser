@@ -188,7 +188,51 @@ pub const ContentWindow = struct {
         return self._window.atob(input, page);
     }
 
+    pub fn prompt(self: *const ContentWindow, message: ?js.Value, default_value: ?js.Value) ?[]const u8 {
+        return self._window.prompt(message, default_value);
+    }
+
     pub fn scrollTo(_: *ContentWindow, _: js.Value, _: ?js.Value, _: *Page) void {}
+
+    pub fn close(self: *const ContentWindow) void {
+        self._window.close();
+    }
+
+    pub fn focus(self: *const ContentWindow) void {
+        self._window.focus();
+    }
+
+    pub fn blur(self: *const ContentWindow) void {
+        self._window.blur();
+    }
+
+    pub fn moveTo(self: *const ContentWindow, x: i32, y: i32) void {
+        self._window.moveTo(x, y);
+    }
+
+    pub fn moveBy(self: *const ContentWindow, x: i32, y: i32) void {
+        self._window.moveBy(x, y);
+    }
+
+    pub fn resizeTo(self: *const ContentWindow, w: i32, h: i32) void {
+        self._window.resizeTo(w, h);
+    }
+
+    pub fn resizeBy(self: *const ContentWindow, dw: i32, dh: i32) void {
+        self._window.resizeBy(dw, dh);
+    }
+
+    pub fn print(self: *const ContentWindow) void {
+        self._window.print();
+    }
+
+    pub fn stop(self: *const ContentWindow) void {
+        self._window.stop();
+    }
+
+    pub fn rtcPeerConnection(self: *const ContentWindow, config: ?js.Value) void {
+        self._window.rtcPeerConnection(config);
+    }
 
     pub fn getNavigator(self: *ContentWindow) *Navigator {
         return &self._navigator;
@@ -241,6 +285,17 @@ pub const ContentWindow = struct {
         pub const clearInterval = bridge.function(ContentWindow.clearInterval, .{});
         pub const btoa = bridge.function(ContentWindow.btoa, .{});
         pub const atob = bridge.function(ContentWindow.atob, .{});
+        pub const prompt = bridge.function(ContentWindow.prompt, .{});
+        pub const close = bridge.function(ContentWindow.close, .{});
+        pub const focus = bridge.function(ContentWindow.focus, .{});
+        pub const blur = bridge.function(ContentWindow.blur, .{});
+        pub const moveTo = bridge.function(ContentWindow.moveTo, .{});
+        pub const moveBy = bridge.function(ContentWindow.moveBy, .{});
+        pub const resizeTo = bridge.function(ContentWindow.resizeTo, .{});
+        pub const resizeBy = bridge.function(ContentWindow.resizeBy, .{});
+        pub const print = bridge.function(ContentWindow.print, .{});
+        pub const stop = bridge.function(ContentWindow.stop, .{});
+        pub const RTCPeerConnection = bridge.function(ContentWindow.rtcPeerConnection, .{});
         pub const scrollTo = bridge.function(ContentWindow.scrollTo, .{});
         pub const scroll = bridge.function(ContentWindow.scrollTo, .{});
 

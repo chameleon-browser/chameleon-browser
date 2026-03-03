@@ -418,6 +418,15 @@ pub fn getActiveElement(self: *Document) ?*Element {
     return self.getDocumentElement();
 }
 
+pub fn getScrollingElement(self: *Document) ?*Element {
+    if (self.is(HTMLDocument)) |html_doc| {
+        if (html_doc.getBody()) |body| {
+            return body.asElement();
+        }
+    }
+    return self.getDocumentElement();
+}
+
 pub fn getStyleSheets(self: *Document, page: *Page) !*StyleSheetList {
     if (self._style_sheets) |sheets| {
         return sheets;
@@ -960,6 +969,7 @@ pub const JsApi = struct {
     pub const readyState = bridge.accessor(Document.getReadyState, null, .{});
     pub const implementation = bridge.accessor(Document.getImplementation, null, .{});
     pub const activeElement = bridge.accessor(Document.getActiveElement, null, .{});
+    pub const scrollingElement = bridge.accessor(Document.getScrollingElement, null, .{});
     pub const styleSheets = bridge.accessor(Document.getStyleSheets, null, .{});
     pub const contentType = bridge.accessor(Document.getContentType, null, .{});
     pub const domain = bridge.accessor(Document.getDomain, null, .{});

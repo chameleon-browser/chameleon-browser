@@ -825,7 +825,24 @@ fn processMessages(self: *Client) !bool {
 
         defer transfer.deinit();
 
-        if (errorCheck(msg.data.result)) blk: {
+        var result_err = errorCheck(msg.data.result);
+
+        // Some WAFs append garbage bytes after the valid chunked terminator.
+        // Browsers tolerate this and keep the successfully received body.
+        if (result_err) |_| {} else |err| {
+            if (transfer._header_done_called and transfer.bytes_received > 0) {
+                if (err == error.WriteError or err == error.PartialFile or err == error.RecvError) {
+                    log.warn(.http, "tolerating transfer err", .{
+                        .url = transfer.url,
+                        .bytes = transfer.bytes_received,
+                        .err = err,
+                    });
+                    result_err = {};
+                }
+            }
+        }
+
+        if (result_err) |_| blk: {
             // In case of request w/o data, we need to call the header done
             // callback now.
             if (!transfer._header_done_called) {

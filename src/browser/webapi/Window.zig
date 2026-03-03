@@ -31,6 +31,7 @@ const Navigator = @import("Navigator.zig");
 const Chrome = @import("Chrome.zig");
 const Screen = @import("Screen.zig");
 const SpeechSynthesis = @import("SpeechSynthesis.zig");
+const Scheduler = @import("Scheduler.zig");
 const VisualViewport = @import("VisualViewport.zig");
 const Performance = @import("Performance.zig");
 const Document = @import("Document.zig");
@@ -51,6 +52,13 @@ const IS_DEBUG = builtin.mode == .Debug;
 
 const Allocator = std.mem.Allocator;
 
+pub fn registerTypes() []const type {
+    return &.{
+        Window,
+        Scheduler,
+    };
+}
+
 const Window = @This();
 
 _proto: *EventTarget,
@@ -61,6 +69,7 @@ _console: Console = .init,
 _navigator: Navigator = .init,
 _chrome: Chrome = .init,
 _speech_synthesis: SpeechSynthesis = .init,
+_scheduler: Scheduler = .init,
 _screen: *Screen,
 _visual_viewport: *VisualViewport,
 _performance: Performance,
@@ -121,6 +130,10 @@ pub fn getSpeechSynthesis(self: *Window) *SpeechSynthesis {
     return &self._speech_synthesis;
 }
 
+pub fn getScheduler(self: *Window) *Scheduler {
+    return &self._scheduler;
+}
+
 pub fn getScreen(self: *Window) *Screen {
     return self._screen;
 }
@@ -167,6 +180,26 @@ pub fn getIsSecureContext(_: *const Window, page: *Page) bool {
 pub fn openDatabase(_: *const Window) bool {
     return false;
 }
+
+pub fn close(_: *const Window) void {}
+
+pub fn focus(_: *const Window) void {}
+
+pub fn blur(_: *const Window) void {}
+
+/// No-op stubs for window positioning/sizing (headless browser has no real window)
+pub fn moveTo(_: *const Window, _: i32, _: i32) void {}
+pub fn moveBy(_: *const Window, _: i32, _: i32) void {}
+pub fn resizeTo(_: *const Window, _: i32, _: i32) void {}
+pub fn resizeBy(_: *const Window, _: i32, _: i32) void {}
+
+/// No-op: print dialog is not applicable in headless mode
+pub fn print(_: *const Window) void {}
+
+/// No-op: stop loading (headless has no visual loading to stop)
+pub fn stop(_: *const Window) void {}
+
+pub fn rtcPeerConnection(_: *const Window, _: ?js.Value) void {}
 
 pub fn setLocation(_: *const Window, url: [:0]const u8, page: *Page) !void {
     return page.scheduleNavigation(url, .{ .reason = .script, .kind = .{ .push = null } }, .script);
@@ -418,6 +451,10 @@ pub fn atob(_: *const Window, input: []const u8, page: *Page) ![]const u8 {
     const decoded = try page.call_arena.alloc(u8, decoded_len);
     std.base64.standard.Decoder.decode(decoded, trimmed) catch return error.InvalidCharacterError;
     return decoded;
+}
+
+pub fn prompt(_: *const Window, _: ?js.Value, _: ?js.Value) ?[]const u8 {
+    return null;
 }
 
 pub fn getFrame(_: *Window, _: usize) !?*Window {
@@ -789,6 +826,7 @@ pub const JsApi = struct {
     pub const navigator = bridge.accessor(Window.getNavigator, null, .{});
     pub const chrome = bridge.accessor(Window.getChrome, null, .{});
     pub const speechSynthesis = bridge.accessor(Window.getSpeechSynthesis, null, .{});
+    pub const scheduler = bridge.accessor(Window.getScheduler, null, .{});
     pub const screen = bridge.accessor(Window.getScreen, null, .{});
     pub const visualViewport = bridge.accessor(Window.getVisualViewport, null, .{});
     pub const performance = bridge.accessor(Window.getPerformance, null, .{});
@@ -822,10 +860,21 @@ pub const JsApi = struct {
     pub const postMessage = bridge.function(Window.postMessage, .{});
     pub const btoa = bridge.function(Window.btoa, .{});
     pub const atob = bridge.function(Window.atob, .{});
+    pub const prompt = bridge.function(Window.prompt, .{});
     pub const reportError = bridge.function(Window.reportError, .{});
     pub const getComputedStyle = bridge.function(Window.getComputedStyle, .{});
     pub const getSelection = bridge.function(Window.getSelection, .{});
     pub const openDatabase = bridge.function(Window.openDatabase, .{});
+    pub const close = bridge.function(Window.close, .{});
+    pub const focus = bridge.function(Window.focus, .{});
+    pub const blur = bridge.function(Window.blur, .{});
+    pub const moveTo = bridge.function(Window.moveTo, .{});
+    pub const moveBy = bridge.function(Window.moveBy, .{});
+    pub const resizeTo = bridge.function(Window.resizeTo, .{});
+    pub const resizeBy = bridge.function(Window.resizeBy, .{});
+    pub const print = bridge.function(Window.print, .{});
+    pub const stop = bridge.function(Window.stop, .{});
+    pub const RTCPeerConnection = bridge.function(Window.rtcPeerConnection, .{});
     pub const frames = bridge.accessor(Window.getWindow, null, .{});
     pub const index = bridge.indexed(Window.getFrame, .{ .null_as_undefined = true });
     pub const length = bridge.accessor(Window.getFramesLength, null, .{});
